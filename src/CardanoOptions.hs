@@ -123,7 +123,7 @@ data OptionsRedeemer
   | CloseProposedContracts
   | AcceptContract
   | ExecuteContract TokenName -- ^ The contract ID of the contract to be executed.
-  | CloseActiveContract -- ^ Reclaim assets after a contract expires without being executed.
+  | CloseExpiredContract -- ^ Reclaim assets after a contract expires without being executed.
   deriving (Haskell.Show,Generic)
 
 data OptionsBeaconRedeemer
@@ -360,7 +360,7 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = 
       --     1) 5 ADA <> (uncurry singleton desiredAsset) (ceiling $ currentAssetQuantity * strikePrice)
       -- The 5 ADA was the creator's deposit from the AssetsForContract UTxO.
       traceIfFalse "Creator not properly paid desired asset" creatorPaid
-    CloseActiveContract ->
+    CloseExpiredContract ->
       -- | The UTxO must have an ActiveContract datum.
       traceIfFalse "Datum is not an ActiveContract datum" (encodeDatum optionsDatum == 2) &&
       -- | The address' staking credential must signal approval.
@@ -498,7 +498,7 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
       -- 5 ADA is used as the min deposit because a hard coded minUTxO value is easier to protect
       -- than a variable one. By setting it to 5 ADA, most UTxO sizes should be possible while still
       -- allowing the script to easily protect the writer's deposit.
-      assetsOrProposedDestinationCheck
+      traceIfFalse "Receiving staking credential did not approve" assetsOrProposedDestinationCheck
     MintProposedBeacons ->
       -- | The following function checks:
       -- 1) Must only mint tokens with the token name "Proposed". Can mint multiple of this token.
@@ -518,7 +518,7 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
       --     a) 3 ADA <> 1 Proposed beacon
       -- Hard coding the minUTxO value to 3 makes it easier to ensure the writer's deposit is returned
       -- when the contract is accepted.
-      assetsOrProposedDestinationCheck
+      traceIfFalse "Receiving staking credential did not approve" assetsOrProposedDestinationCheck
     MintActiveBeacon contractId stakingCred ->
       -- ============================
       -- | Beacon Usage Verification:
@@ -587,13 +587,13 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
       (MintAssetsBeacon,[(_,tn,n)]) ->
         traceIfFalse "The Assets beacon must have the token name 'Assets'" (tn == TokenName "Assets") &&
         traceIfFalse "Only one Assets beacon can be minted per tx" (n == 1)
-      (MintAssetsBeacon, _) -> traceError "Only the Assets beacon can be minted with this redeemer"
+      (MintAssetsBeacon, _) -> traceError "This redeemer only allows minting one Assets beacon"
       (MintProposedBeacons, [(_,tn,n)]) ->
         traceIfFalse "The Proposed beacon must have the token name 'Proposed'" 
           (tn == TokenName "Proposed") &&
         traceIfFalse "The Proposed beacon can only be minted with this redeemer" (n > 0)
       (MintProposedBeacons, _) ->
-        traceError "Only Proposed beacons can be minted with this redeemer"
+        traceError "This redeemer only allows minting Proposed beacons"
       (MintActiveBeacon contractId _, [_,_,_,_]) ->
         let numAssetsBurned = valueOf minted beaconSym (TokenName "Assets")
             numProposedBurned = valueOf minted beaconSym (TokenName "Proposed")
@@ -632,29 +632,33 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
       | strikePrice <= fromInteger 0 = traceError "Invalid ProposedContract strikePrice"
       | premium <= 0 = traceError "Invalid ProposedContract premium"
       | expiration <= 0 = traceError "Invalid ProposedContract expiration"
+      | otherwise = True
     validDatum MintProposedBeacons _ = traceError "Proposed beacon stored with wrong datum type"
     validDatum _ _ = False -- ^ This function is never called with the other redeemers.
 
     -- | This checks that the beacons are stored with the proper values. Helps simplify
-    -- destinationCheck.
+    -- destinationCheck. Either fails with error or returns True.
     utxoHasProperValue :: Value -> OptionsDatum -> Bool
     utxoHasProperValue oVal AssetsForContract{..} =
-      traceIfFalse "AssetsForContract UTxO not stored with proper value" $
-        oVal == lovelaceValueOf 5_000_000
-             <> (uncurry singleton currentAsset) currentAssetQuantity
-             <> singleton beaconSym (TokenName "Assets") 1
+      if oVal == lovelaceValueOf 5_000_000
+              <> (uncurry singleton currentAsset) currentAssetQuantity
+              <> singleton beaconSym (TokenName "Assets") 1
+      then True
+      else traceError "AssetsForContract UTxO not stored with proper value"
     utxoHasProperValue oVal ProposedContract{} =
-      traceIfFalse "ProposedContract UTxO not stored with proper value" $
-        oVal == lovelaceValueOf 3_000_000 
-             <> singleton beaconSym (TokenName "Proposed") 1 -- ^ Only one Proposed beacon per UTxO.
+      if oVal == lovelaceValueOf 3_000_000 
+              <> singleton beaconSym (TokenName "Proposed") 1 -- ^ Only one Proposed beacon per UTxO.
+      then True
+      else traceError "ProposedContract UTxO not stored with proper value"
     utxoHasProperValue oVal ActiveContract{..} =
-      traceIfFalse "ActiveContract UTxO not stored with proper value" $
-        oVal == lovelaceValueOf 5_000_000
-             <> (uncurry singleton currentAsset) currentAssetQuantity
-             <> singleton beaconSym (TokenName "Active") 1
-             <> singleton beaconSym contractId 1 
-                  -- ^ Only one ContractId should be stored with contract.
-
+      if oVal == lovelaceValueOf 5_000_000
+              <> (uncurry singleton currentAsset) currentAssetQuantity
+              <> singleton beaconSym (TokenName "Active") 1
+              <> singleton beaconSym contractId 1 
+                   -- ^ Only one ContractID should be stored with contract.
+      then True
+      else traceError "ActiveContract UTxO not stored with proper value"
+        
     activeDestinationCheck :: Credential -> OptionsDatum -> Bool
     activeDestinationCheck stakingCred datum@ActiveContract{..} =
       let outputs = txInfoOutputs info
@@ -683,13 +687,23 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
               , oVal == lovelaceValueOf 3_000_000 -- ^ Deposit from the ProposedContract UTxO.
                      <> (uncurry singleton premiumAsset) premium
               )
+            -- | Make sure there are no invalid outputs to dApp address.
+            else if addrCred == ScriptCredential valHash && 
+                 maybeStakeCred == Just (StakingHash stakingCred) then
+                    -- | It must have an Active beacon.
+                    if valueOf oVal beaconSym (TokenName "Active") /= 1 then
+                      traceError "Invalid output to dApp address"
+                    else acc
             else acc -- ^ Skip input.
       in case foldl' foo (True,False) outputs of
         (True,True) -> True
         (_,False) -> traceError "Premium not paid"
-        (False,_) -> traceError "Invalid Active beacon output"
+        (False,_) -> traceError "Invalid ActiveContract datum" 
+          -- ^ This can only be false if datum does not match the expected datum.
     activeDestinationCheck _ _ = False -- ^ Never called with other datums.
 
+    -- | This can only return False if the staking credential did not approve. Otherwise, it will
+    -- either fail with an error message or return True.
     assetsOrProposedDestinationCheck :: Bool
     assetsOrProposedDestinationCheck =
       let outputs = txInfoOutputs info
@@ -721,9 +735,6 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
               _ -> False -- ^ Never used for the other redeemers
       in foldl' foo True outputs
   
-
-
-
 optionsBeaconPolicy :: MintingPolicy
 optionsBeaconPolicy = Plutonomy.optimizeUPLC $ mkMintingPolicyScript
   ($$(PlutusTx.compile [|| wrap ||])

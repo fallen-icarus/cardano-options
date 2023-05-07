@@ -348,9 +348,11 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = 
         (contractId optionsDatum == contractId') &&
       -- | The contract must not be expired.
       traceIfFalse "Contract is expired" (not $ contractIsExpired executionTime) &&
-      -- | Both ContractIDs must be burned.
-      traceIfFalse "Two ContractIDs not burned"
-        (valueOf minted (beaconSymbol optionsDatum) contractId' == (-2)) &&
+      -- | Exactly one ContractID must be burned. The other will be used as a receipt of
+      -- execution to guarantee unique payments. This prevents double satisfaction despite
+      -- composing executions.
+      traceIfFalse "One ContractID not burned"
+        (valueOf minted (beaconSymbol optionsDatum) contractId' == (-1)) &&
       -- | All Active beacons among tx inputs must be burned.
       traceIfFalse "Active beacons not burned."
         ( valueOf totalInputValue (beaconSymbol optionsDatum) (TokenName "Active") == 
@@ -358,8 +360,9 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = 
         ) &&
       -- | The following value must be paid to the creator's address:
       --     1) 5 ADA <> (uncurry singleton desiredAsset) (ceiling $ currentAssetQuantity * strikePrice)
+      --              <> 1 ContractID
       -- The 5 ADA was the creator's deposit from the AssetsForContract UTxO.
-      traceIfFalse "Creator not properly paid desired asset" creatorPaid
+      traceIfFalse "Creator not properly paid desired asset" (creatorPaid contractId')
     CloseExpiredContract ->
       -- | The UTxO must have an ActiveContract datum.
       traceIfFalse "Datum is not an ActiveContract datum" (encodeDatum optionsDatum == 2) &&
@@ -433,23 +436,34 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = 
       where
         i' = truncate rat
 
-    -- | Checks whether the creator was paid when a contract is executed.
-    creatorPaid :: Bool
-    creatorPaid =
+    -- | Checks whether the creator was paid when a contract is executed. If there are two identical
+    -- contract payments due (same value and target address), a double satisfaction can occur if
+    -- the payments are made in the same tx. To prevent this, every payment must be guaranteed to
+    -- be unique. This can be achieved by requiring the non-burned ContractID to be included in the
+    -- payment output.
+    creatorPaid :: TokenName -> Bool
+    creatorPaid contractId' =
       let outputs = txInfoOutputs info
           due = ceiling $ fromInteger (currentAssetQuantity optionsDatum) * strikePrice optionsDatum
           creatorAddr = creatorAddress optionsDatum
           desired = desiredAsset optionsDatum
-          foo targetAddr targetAsset due' acc TxOut{txOutValue = oVal
-                                                   ,txOutAddress = addr
-                                                   } =
+          receiptToken = (beaconSymbol optionsDatum,contractId')
+          foo targetAddr targetAsset due' receiptToken' acc TxOut{txOutValue = oVal
+                                                                 ,txOutAddress = addr
+                                                                 } =
             -- | Check if the output is to the creator.
             if addr == targetAddr then
-              -- | Check if the output has the proper value.
-              oVal == lovelaceValueOf 5_000_000 -- ^ Creator's deposit from AssetsForContract UTxO.
-                   <> (uncurry singleton targetAsset) due'
+              -- | Check if the output has the proper value. The other ContractID must be included
+              -- in the payment to guarantee uniqueness of the payment. This uses OR since only
+              -- one output needs to be valid. Since acc is initially set to False, this can
+              -- only return True if a valid output is present.
+              acc ||
+                ( oVal == lovelaceValueOf 5_000_000 -- ^ Creator's deposit from AssetsForContract UTxO.
+                    <> (uncurry singleton targetAsset) due'
+                    <> (uncurry singleton receiptToken') 1
+                )
             else acc -- ^ Skip input.
-      in foldl' (foo creatorAddr desired due) False outputs
+      in foldl' (foo creatorAddr desired due receiptToken) False outputs
 
 data Options
 instance ValidatorTypes Options where

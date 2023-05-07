@@ -76,6 +76,14 @@ import Ledger.Ada (lovelaceValueOf)
 -------------------------------------------------
 -- Data Types
 -------------------------------------------------
+-- | Extra parameter for the spending script.
+-- This helps ensure only the target assets are swapped and creates a unique beacon for
+-- each trading pair.
+data OptionsConfig = OptionsConfig
+  { currentAssetConfig :: (CurrencySymbol,TokenName)
+  , desiredAssetConfig :: (CurrencySymbol,TokenName)
+  }
+
 data OptionsDatum 
   = AssetsForContract -- ^ The datum for the UTxO containing the assets for the contract.
       { beaconSymbol :: CurrencySymbol -- ^ Policy Id for the options beaocn policy.
@@ -145,6 +153,8 @@ type AppName = BuiltinString
 PlutusTx.unstableMakeIsData ''OptionsDatum
 PlutusTx.unstableMakeIsData ''OptionsRedeemer
 PlutusTx.unstableMakeIsData ''OptionsBeaconRedeemer
+
+PlutusTx.makeLift ''OptionsConfig
 
 -------------------------------------------------
 -- Helper Functions
@@ -299,8 +309,10 @@ acceptContractInputCheck beaconSym contractId valHash stakingCred info =
 --
 -- This validator follows the American rules for options contracts where the contract can 
 -- be executed at any time before the expiration.
-mkOptionsValidator :: OptionsDatum -> OptionsRedeemer -> ScriptContext -> Bool
-mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = case r of
+mkOptionsValidator :: OptionsConfig -- ^ Extra Parameter
+                   -> OptionsDatum -> OptionsRedeemer -> ScriptContext -> Bool
+mkOptionsValidator OptionsConfig{..} optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = 
+  case r of
     CloseAssets ->
       -- | The UTxO must have an AssetsForContract datum.
       traceIfFalse "Datum is not an AssetsForContract datum" (encodeDatum optionsDatum == 0) &&
@@ -359,8 +371,9 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = 
             Num.negate (valueOf minted (beaconSymbol optionsDatum) (TokenName "Active"))
         ) &&
       -- | The following value must be paid to the creator's address:
-      --     1) 5 ADA <> (uncurry singleton desiredAsset) (ceiling $ currentAssetQuantity * strikePrice)
-      --              <> 1 ContractID
+      --     1) 5 ADA 
+      --       <> (uncurry singleton desiredAssetConfig) (ceiling $ currentAssetQuantity * strikePrice)
+      --       <> 1 ContractID
       -- The 5 ADA was the creator's deposit from the AssetsForContract UTxO.
       traceIfFalse "Creator not properly paid desired asset" (creatorPaid contractId')
     CloseExpiredContract ->
@@ -446,7 +459,7 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = 
       let outputs = txInfoOutputs info
           due = ceiling $ fromInteger (currentAssetQuantity optionsDatum) * strikePrice optionsDatum
           creatorAddr = creatorAddress optionsDatum
-          desired = desiredAsset optionsDatum
+          desired = desiredAssetConfig
           receiptToken = (beaconSymbol optionsDatum,contractId')
           foo targetAddr targetAsset due' receiptToken' acc TxOut{txOutValue = oVal
                                                                  ,txOutAddress = addr
@@ -470,17 +483,18 @@ instance ValidatorTypes Options where
   type instance RedeemerType Options = OptionsRedeemer
   type instance DatumType Options = OptionsDatum
 
-optionsValidator :: Validator
-optionsValidator = Plutonomy.optimizeUPLC $ validatorScript $ mkTypedValidator @Options
-    $$(PlutusTx.compile [|| mkOptionsValidator ||])
+optionsValidator :: OptionsConfig -> Validator
+optionsValidator config = Plutonomy.optimizeUPLC $ validatorScript $ mkTypedValidator @Options
+    ($$(PlutusTx.compile [|| mkOptionsValidator ||])
+      `PlutusTx.applyCode` PlutusTx.liftCode config)
     $$(PlutusTx.compile [|| wrap ||])
   where wrap = mkUntypedValidator
 
-optionsValidatorScript :: Script
-optionsValidatorScript = unValidatorScript optionsValidator
+optionsValidatorScript :: OptionsConfig -> Script
+optionsValidatorScript = unValidatorScript . optionsValidator
 
-optionsValidatorHash :: ValidatorHash
-optionsValidatorHash = Scripts.validatorHash optionsValidator
+optionsValidatorHash :: OptionsConfig -> ValidatorHash
+optionsValidatorHash = Scripts.validatorHash . optionsValidator
 
 -------------------------------------------------
 -- On-Chain Options Beacon Policy
@@ -749,16 +763,17 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
               _ -> False -- ^ Never used for the other redeemers
       in foldl' foo True outputs
   
-optionsBeaconPolicy :: MintingPolicy
-optionsBeaconPolicy = Plutonomy.optimizeUPLC $ mkMintingPolicyScript
+optionsBeaconPolicy :: OptionsConfig -> MintingPolicy
+optionsBeaconPolicy config = Plutonomy.optimizeUPLC $ mkMintingPolicyScript
   ($$(PlutusTx.compile [|| wrap ||])
     `PlutusTx.applyCode` PlutusTx.liftCode app
-    `PlutusTx.applyCode` PlutusTx.liftCode optionsValidatorHash)
+    `PlutusTx.applyCode` PlutusTx.liftCode valHash)
   where
     wrap x y = mkUntypedMintingPolicy $ mkOptionsBeaconPolicy x y
+    valHash = optionsValidatorHash config
 
-optionsBeaconPolicyScript :: Script
-optionsBeaconPolicyScript = unMintingPolicyScript optionsBeaconPolicy
+optionsBeaconPolicyScript :: OptionsConfig -> Script
+optionsBeaconPolicyScript = unMintingPolicyScript . optionsBeaconPolicy
 
-optionsBeaconPolicySymbol :: CurrencySymbol
-optionsBeaconPolicySymbol = scriptCurrencySymbol optionsBeaconPolicy
+optionsBeaconPolicySymbol :: OptionsConfig -> CurrencySymbol
+optionsBeaconPolicySymbol = scriptCurrencySymbol . optionsBeaconPolicy

@@ -14,7 +14,7 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE StrictData #-}
 
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans -Wno-incomplete-patterns #-}
 
 module Test.Common where
 

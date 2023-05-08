@@ -46,6 +46,14 @@ test-suite cardano-options-tests
     -threaded -rtsopts -with-rtsopts=-N
     -Wno-unused-local-binds -Wno-unused-matches
   other-modules:
+      Test.AcceptContract
+    , Test.CloseAssetsUTxO
+    , Test.CloseExpiredContract
+    , Test.CloseProposalUTxO
+    , Test.Common
+    , Test.CreateAssetsUTxO
+    , Test.ExecuteContract
+    , Test.ProposeContracts
   build-depends:
     cardano-options,
     cardano-api,

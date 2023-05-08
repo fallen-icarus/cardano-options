@@ -45,7 +45,7 @@ successfullyCloseSingleProposalContract = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -66,12 +66,12 @@ successfullyCloseSingleProposalContract = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -81,25 +81,25 @@ successfullyCloseSingleProposalContract = do
 
   callEndpoint @"close-proposal-utxo(s)" h1 $
     CloseProposalParams
-      { closeProposalBeaconsBurned = [("Proposed",-1)]
+      { closeProposalBeaconsBurned = [[("Proposed",-1)]]
       , closeProposalBeaconRedeemer = BurnBeacons
-      , closeProposalBeaconPolicy = optionsBeaconPolicy
+      , closeProposalBeaconPolicies = [optionsBeaconPolicy1]
       , closeProposalOptionsVal = optionsValidator
       , closeProposalOptionsAddress = addr
       , closeProposalSpecificUTxOs = 
           [ ( proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       }
 
-successfullyCloseMultipleProposalContracts :: EmulatorTrace ()
-successfullyCloseMultipleProposalContracts = do
+successfullyCloseMultipleSameProposalContracts :: EmulatorTrace ()
+successfullyCloseMultipleSameProposalContracts = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -120,16 +120,16 @@ successfullyCloseMultipleProposalContracts = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",2)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           , ( Just proposeDatum{premium = 5_000_000}
             , lovelaceValueOf 3_000_000
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       , proposeAsInline = True
@@ -139,19 +139,105 @@ successfullyCloseMultipleProposalContracts = do
 
   callEndpoint @"close-proposal-utxo(s)" h1 $
     CloseProposalParams
-      { closeProposalBeaconsBurned = [("Proposed",-2)]
+      { closeProposalBeaconsBurned = [[("Proposed",-2)]]
       , closeProposalBeaconRedeemer = BurnBeacons
-      , closeProposalBeaconPolicy = optionsBeaconPolicy
+      , closeProposalBeaconPolicies = [optionsBeaconPolicy1]
       , closeProposalOptionsVal = optionsValidator
       , closeProposalOptionsAddress = addr
       , closeProposalSpecificUTxOs = 
           [ ( proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           , ( proposeDatum{premium = 5_000_000}
             , lovelaceValueOf 3_000_000
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+            )
+          ]
+      }
+
+successfullyCloseMultipleDifferentProposalContracts :: EmulatorTrace ()
+successfullyCloseMultipleDifferentProposalContracts = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let proposeDatum = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 10
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym4
+        , currentAsset = testToken1
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken2
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 10
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = addr
+      , proposeInfo = 
+          [ ( Just proposeDatum
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+            )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy4
+      , proposeAddress = addr
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym4 "Proposed" 1
+            )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  callEndpoint @"close-proposal-utxo(s)" h1 $
+    CloseProposalParams
+      { closeProposalBeaconsBurned = [[("Proposed",-1)],[("Proposed",-1)]]
+      , closeProposalBeaconRedeemer = BurnBeacons
+      , closeProposalBeaconPolicies = [optionsBeaconPolicy1,optionsBeaconPolicy4]
+      , closeProposalOptionsVal = optionsValidator
+      , closeProposalOptionsAddress = addr
+      , closeProposalSpecificUTxOs = 
+          [ ( proposeDatum
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+            )
+          , ( proposeDatum2
+            , lovelaceValueOf 3_000_000
+           <> singleton optionsBeaconPolicySym4 "Proposed" 1
             )
           ]
       }
@@ -161,9 +247,10 @@ datumIsNotProposedContract = do
   h1 <- activateContractWallet (knownWallet 3) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -176,12 +263,12 @@ datumIsNotProposedContract = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -192,15 +279,15 @@ datumIsNotProposedContract = do
 
   callEndpoint @"close-proposal-utxo(s)" h1 $
     CloseProposalParams
-      { closeProposalBeaconsBurned = [("Proposed",-5)]
+      { closeProposalBeaconsBurned = [[("Proposed",-5)]]
       , closeProposalBeaconRedeemer = BurnBeacons
-      , closeProposalBeaconPolicy = optionsBeaconPolicy
+      , closeProposalBeaconPolicies = [optionsBeaconPolicy1]
       , closeProposalOptionsVal = optionsValidator
       , closeProposalOptionsAddress = addr
       , closeProposalSpecificUTxOs = 
           [ ( assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -211,7 +298,7 @@ onlyProposedBeaconNotBurned = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -232,12 +319,12 @@ onlyProposedBeaconNotBurned = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -249,13 +336,13 @@ onlyProposedBeaconNotBurned = do
     CloseProposalParams
       { closeProposalBeaconsBurned = []
       , closeProposalBeaconRedeemer = BurnBeacons
-      , closeProposalBeaconPolicy = optionsBeaconPolicy
+      , closeProposalBeaconPolicies = [optionsBeaconPolicy1]
       , closeProposalOptionsVal = optionsValidator
       , closeProposalOptionsAddress = addr
       , closeProposalSpecificUTxOs = 
           [ ( proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       }
@@ -265,7 +352,7 @@ atLeastOneProposedBeaconNotBurned = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -286,16 +373,16 @@ atLeastOneProposedBeaconNotBurned = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",2)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           , ( Just proposeDatum{premium = 5_000_000}
             , lovelaceValueOf 3_000_000
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       , proposeAsInline = True
@@ -305,19 +392,19 @@ atLeastOneProposedBeaconNotBurned = do
 
   callEndpoint @"close-proposal-utxo(s)" h1 $
     CloseProposalParams
-      { closeProposalBeaconsBurned = [("Proposed",-1)]
+      { closeProposalBeaconsBurned = [[("Proposed",-1)]]
       , closeProposalBeaconRedeemer = BurnBeacons
-      , closeProposalBeaconPolicy = optionsBeaconPolicy
+      , closeProposalBeaconPolicies = [optionsBeaconPolicy1]
       , closeProposalOptionsVal = optionsValidator
       , closeProposalOptionsAddress = addr
       , closeProposalSpecificUTxOs = 
           [ ( proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           , ( proposeDatum{premium = 5_000_000}
             , lovelaceValueOf 3_000_000
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       }
@@ -327,7 +414,7 @@ activeBeaconMinted = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -348,12 +435,12 @@ activeBeaconMinted = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -363,15 +450,15 @@ activeBeaconMinted = do
 
   callEndpoint @"close-proposal-utxo(s)" h1 $
     CloseProposalParams
-      { closeProposalBeaconsBurned = [("Proposed",-1),("Active",1)]
+      { closeProposalBeaconsBurned = [[("Proposed",-1),("Active",1)]]
       , closeProposalBeaconRedeemer = BurnBeacons
-      , closeProposalBeaconPolicy = optionsBeaconPolicy
+      , closeProposalBeaconPolicies = [optionsBeaconPolicy1]
       , closeProposalOptionsVal = optionsValidator
       , closeProposalOptionsAddress = addr
       , closeProposalSpecificUTxOs = 
           [ ( proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       }
@@ -382,7 +469,7 @@ stakingCredDidNotApprove = do
   h2 <- activateContractWallet (knownWallet 4) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -403,12 +490,12 @@ stakingCredDidNotApprove = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -418,15 +505,15 @@ stakingCredDidNotApprove = do
 
   callEndpoint @"close-proposal-utxo(s)" h2 $
     CloseProposalParams
-      { closeProposalBeaconsBurned = [("Proposed",-1)]
+      { closeProposalBeaconsBurned = [[("Proposed",-1)]]
       , closeProposalBeaconRedeemer = BurnBeacons
-      , closeProposalBeaconPolicy = optionsBeaconPolicy
+      , closeProposalBeaconPolicies = [optionsBeaconPolicy1]
       , closeProposalOptionsVal = optionsValidator
       , closeProposalOptionsAddress = addr
       , closeProposalSpecificUTxOs = 
           [ ( proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       }
@@ -436,7 +523,7 @@ successfullyCloseInvalidProposal = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -457,7 +544,7 @@ successfullyCloseInvalidProposal = do
     ProposeParams
       { proposeBeaconsMinted = []
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
@@ -473,7 +560,7 @@ successfullyCloseInvalidProposal = do
     CloseProposalParams
       { closeProposalBeaconsBurned = []
       , closeProposalBeaconRedeemer = BurnBeacons
-      , closeProposalBeaconPolicy = optionsBeaconPolicy
+      , closeProposalBeaconPolicies = [optionsBeaconPolicy1]
       , closeProposalOptionsVal = optionsValidator
       , closeProposalOptionsAddress = addr
       , closeProposalSpecificUTxOs = 
@@ -489,6 +576,7 @@ successfullyCloseInvalidProposal = do
 tests :: TestTree
 tests = do
   let opts = defaultCheckOptions & emulatorConfig .~ emConfig
+      lenientOpts = defaultCheckOptions & emulatorConfig .~ lenientConfig
   testGroup "Close Proposal UTxO(s)"
     [ checkPredicateOptions opts "Fail if datum is not ProposedContract"
         (Test.not assertNoFailedTransactions) datumIsNotProposedContract
@@ -503,11 +591,13 @@ tests = do
 
     , checkPredicateOptions opts "Successfully close a single Proposal UTxO"
         assertNoFailedTransactions successfullyCloseSingleProposalContract
-    , checkPredicateOptions opts "Successfully close multiple Proposal UTxOs"
-        assertNoFailedTransactions successfullyCloseMultipleProposalContracts
+    , checkPredicateOptions opts "Successfully close multiple same Proposal UTxOs"
+        assertNoFailedTransactions successfullyCloseMultipleSameProposalContracts
+    , checkPredicateOptions lenientOpts "Successfully close multiple different Proposal UTxOs"
+        assertNoFailedTransactions successfullyCloseMultipleDifferentProposalContracts
     , checkPredicateOptions opts "Successfully close invalid Proposal UTxO"
         assertNoFailedTransactions successfullyCloseInvalidProposal
     ]
 
 testTrace :: IO ()
-testTrace = runEmulatorTraceIO' def emConfig successfullyCloseInvalidProposal
+testTrace = runEmulatorTraceIO' def lenientConfig successfullyCloseInvalidProposal

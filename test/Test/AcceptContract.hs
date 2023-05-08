@@ -41,130 +41,8 @@ import CardanoOptions
 -------------------------------------------------
 -- Accept Scenarios
 -------------------------------------------------
-successfullyAcceptContract :: EmulatorTrace ()
-successfullyAcceptContract = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
-      , assetsInfo = 
-          [ ( Just assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-  void $ waitUntilSlot 4
-
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
-
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
-        }
-           
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
-          ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
-      }
-
-successfullyUseMultiAcceptContract :: EmulatorTrace ()
-successfullyUseMultiAcceptContract = do
+successfullyAcceptSingleContract :: EmulatorTrace ()
+successfullyAcceptSingleContract = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
@@ -177,14 +55,16 @@ successfullyUseMultiAcceptContract = do
                           $ mockWalletPaymentPubKeyHash
                           $ knownWallet 5
       assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       assetsDatum2 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
@@ -203,12 +83,12 @@ successfullyUseMultiAcceptContract = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -221,12 +101,12 @@ successfullyUseMultiAcceptContract = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr2
       , assetsInfo = 
           [ ( Just assetsDatum2
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -236,7 +116,7 @@ successfullyUseMultiAcceptContract = do
   void $ waitUntilSlot 4
 
   let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -247,7 +127,7 @@ successfullyUseMultiAcceptContract = do
         , expiration = slotToBeginPOSIXTime def 20
         }
       proposeDatum2 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -262,12 +142,12 @@ successfullyUseMultiAcceptContract = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -279,12 +159,12 @@ successfullyUseMultiAcceptContract = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr2
       , proposeInfo = 
           [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -293,11 +173,11 @@ successfullyUseMultiAcceptContract = do
   void $ waitUntilSlot 8
 
   targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 100_000_000
                                )
   targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 50_000_000
                                )
 
@@ -305,7 +185,7 @@ successfullyUseMultiAcceptContract = do
   let targetId1 = txIdAsToken targetHash1
       targetId2 = txIdAsToken targetHash2
       activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -317,7 +197,7 @@ successfullyUseMultiAcceptContract = do
         , contractId = targetId1
         }
       activeDatum2 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -329,21 +209,21 @@ successfullyUseMultiAcceptContract = do
         , contractId = targetId2
         }
            
-  callEndpoint @"multi-accept-contracts" h2 $
+  callEndpoint @"accept-contract(s)" h2 $
     MultiAcceptParams
-      { multiAcceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
       , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
-      , multiAcceptBeaconPolicy = optionsBeaconPolicy
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
       , multiAcceptOptionsVal = optionsValidator
       , multiAcceptOptionsAddresses = [optionsAddr1]
       , multiAcceptSpecificUTxOs = 
           [ [ ( proposeDatum1
               , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySymbol "Proposed" 1
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
               )
             , ( assetsDatum1
               , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySymbol "Assets" 1
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
              <> lovelaceValueOf 100_000_000
               )
             ]
@@ -352,8 +232,8 @@ successfullyUseMultiAcceptContract = do
       , multiAcceptChangeOutputs = 
           [ [ ( Just activeDatum1
               , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySymbol "Active" 1
-            <> singleton optionsBeaconPolicySymbol targetId1 1
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
             <> lovelaceValueOf 100_000_000
               )
             ]
@@ -375,859 +255,6 @@ activeBeaconNotMinted = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
-      , assetsInfo = 
-          [ ( Just assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-  void $ waitUntilSlot 4
-
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
-
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
-        }
-           
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Activ",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Activ" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
-          ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
-      }
-
-assetsBeaconNotBurned :: EmulatorTrace ()
-assetsBeaconNotBurned = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
-      , assetsInfo = 
-          [ ( Just assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-  void $ waitUntilSlot 4
-
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
-
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
-        }
-           
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
-          ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
-      }
-
-proposedBeaconNotBurned :: EmulatorTrace ()
-proposedBeaconNotBurned = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
-      , assetsInfo = 
-          [ ( Just assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-  void $ waitUntilSlot 4
-
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
-
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
-        }
-           
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
-          ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
-      }
-
-multipleActiveBeaconsMinted :: EmulatorTrace ()
-multipleActiveBeaconsMinted = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
-      , assetsInfo = 
-          [ ( Just assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-  void $ waitUntilSlot 4
-
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
-
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
-        }
-           
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",2),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
-          ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
-      }
-
-contractIDsNotMinted :: EmulatorTrace ()
-contractIDsNotMinted = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
-      , assetsInfo = 
-          [ ( Just assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-  void $ waitUntilSlot 4
-
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
-
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
-        }
-           
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
-          ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
-      }
-
-additionalContractIDsMinted :: EmulatorTrace ()
-additionalContractIDsMinted = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
-      , assetsInfo = 
-          [ ( Just assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-  void $ waitUntilSlot 4
-
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
-
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
-        }
-           
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,3)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
-          ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
-      }
-
-additionalTokensMinted :: EmulatorTrace ()
-additionalTokensMinted = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
-      , assetsInfo = 
-          [ ( Just assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-  void $ waitUntilSlot 4
-
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
-
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
-        }
-           
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2),("Other",1)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
-          ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
-      }
-
-inputsFromOtherDappAddresses :: EmulatorTrace ()
-inputsFromOtherDappAddresses = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
   let optionsStakingCred1 = PubKeyCredential
                           $ unPaymentPubKeyHash
                           $ mockWalletPaymentPubKeyHash
@@ -1237,14 +264,16 @@ inputsFromOtherDappAddresses = do
                           $ mockWalletPaymentPubKeyHash
                           $ knownWallet 5
       assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       assetsDatum2 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
@@ -1263,12 +292,12 @@ inputsFromOtherDappAddresses = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -1281,12 +310,12 @@ inputsFromOtherDappAddresses = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr2
       , assetsInfo = 
           [ ( Just assetsDatum2
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -1296,7 +325,7 @@ inputsFromOtherDappAddresses = do
   void $ waitUntilSlot 4
 
   let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -1307,7 +336,7 @@ inputsFromOtherDappAddresses = do
         , expiration = slotToBeginPOSIXTime def 20
         }
       proposeDatum2 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -1322,12 +351,12 @@ inputsFromOtherDappAddresses = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -1339,12 +368,12 @@ inputsFromOtherDappAddresses = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr2
       , proposeInfo = 
           [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -1353,11 +382,11 @@ inputsFromOtherDappAddresses = do
   void $ waitUntilSlot 8
 
   targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 100_000_000
                                )
   targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 50_000_000
                                )
 
@@ -1365,7 +394,7 @@ inputsFromOtherDappAddresses = do
   let targetId1 = txIdAsToken targetHash1
       targetId2 = txIdAsToken targetHash2
       activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -1377,7 +406,7 @@ inputsFromOtherDappAddresses = do
         , contractId = targetId1
         }
       activeDatum2 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -1389,31 +418,1714 @@ inputsFromOtherDappAddresses = do
         , contractId = targetId2
         }
            
-  callEndpoint @"multi-accept-contracts" h2 $
+  callEndpoint @"accept-contract(s)" h2 $
     MultiAcceptParams
-      { multiAcceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]
+      { multiAcceptBeaconsMinted = [[("Assets",-1),("Proposed",-1),(targetId1,2)]]
       , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
-      , multiAcceptBeaconPolicy = optionsBeaconPolicy
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
+          ]
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
+      }
+
+assetsBeaconNotBurned :: EmulatorTrace ()
+assetsBeaconNotBurned = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+  h2 <- activateContractWallet (knownWallet 5) endpoints
+
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
+      , assetsInfo = 
+          [ ( Just assetsDatum1
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum1
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 6
+
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
+        }
+           
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
+          ]
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
+      }
+
+proposedBeaconNotBurned :: EmulatorTrace ()
+proposedBeaconNotBurned = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+  h2 <- activateContractWallet (knownWallet 5) endpoints
+
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
+      , assetsInfo = 
+          [ ( Just assetsDatum1
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum1
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 6
+
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
+        }
+           
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
+          ]
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
+      }
+
+multipleActiveBeaconsMinted :: EmulatorTrace ()
+multipleActiveBeaconsMinted = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+  h2 <- activateContractWallet (knownWallet 5) endpoints
+
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
+      , assetsInfo = 
+          [ ( Just assetsDatum1
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum1
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 6
+
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
+        }
+           
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",2),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
+          ]
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
+      }
+
+contractIDsNotMinted :: EmulatorTrace ()
+contractIDsNotMinted = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+  h2 <- activateContractWallet (knownWallet 5) endpoints
+
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
+      , assetsInfo = 
+          [ ( Just assetsDatum1
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum1
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 6
+
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
+        }
+           
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
+          ]
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
+      }
+
+additionalContractIDsMinted :: EmulatorTrace ()
+additionalContractIDsMinted = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+  h2 <- activateContractWallet (knownWallet 5) endpoints
+
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
+      , assetsInfo = 
+          [ ( Just assetsDatum1
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum1
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 6
+
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
+        }
+           
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,3)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
+          ]
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
+      }
+
+additionalTokensMinted :: EmulatorTrace ()
+additionalTokensMinted = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+  h2 <- activateContractWallet (knownWallet 5) endpoints
+
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
+      , assetsInfo = 
+          [ ( Just assetsDatum1
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum1
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 6
+
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
+        }
+           
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2),("o",1)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
+          ]
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
+      }
+
+acceptDifferentContractsFromDifferentAddressses :: EmulatorTrace ()
+acceptDifferentContractsFromDifferentAddressses = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+  h2 <- activateContractWallet (knownWallet 5) endpoints
+
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym4
+        , currentAsset = testToken1
+        , currentAssetQuantity = 10
+        , desiredAsset = testToken2
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
+      , assetsInfo = 
+          [ ( Just assetsDatum1
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy4
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym4 "Assets" 1
+           <> (uncurry singleton testToken1) 10
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym4
+        , currentAsset = testToken1
+        , currentAssetQuantity = 10
+        , desiredAsset = testToken2
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum1
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 6
+
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy4
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym4 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> (uncurry singleton testToken1) 10
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = testToken1
+        , currentAssetQuantity = 10
+        , desiredAsset = testToken2
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
+        }
+           
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = 
+          [ [("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]
+          , [("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]
+          ]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1,optionsBeaconPolicy4]
       , multiAcceptOptionsVal = optionsValidator
       , multiAcceptOptionsAddresses = [optionsAddr1,optionsAddr2]
       , multiAcceptSpecificUTxOs = 
           [ [ ( proposeDatum1
               , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySymbol "Proposed" 1
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
               )
             , ( assetsDatum1
               , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySymbol "Assets" 1
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
              <> lovelaceValueOf 100_000_000
               )
             ]
           , [ ( proposeDatum2
               , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySymbol "Proposed" 1
+             <> singleton optionsBeaconPolicySym4 "Proposed" 1
               )
             , ( assetsDatum2
               , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySymbol "Assets" 1
+             <> singleton optionsBeaconPolicySym4 "Assets" 1
+             <> (uncurry singleton testToken1) 10
+              )
+            ]
+          ]
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
+          ]
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
+      }
+
+acceptSameContractsFromOtherAddressesWithDoubleSatisfaction :: EmulatorTrace ()
+acceptSameContractsFromOtherAddressesWithDoubleSatisfaction = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+  h2 <- activateContractWallet (knownWallet 5) endpoints
+
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
+      , assetsInfo = 
+          [ ( Just assetsDatum1
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum1
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 6
+
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
+        }
+           
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
+          , [ ( proposeDatum2
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum2
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
              <> lovelaceValueOf 50_000_000
               )
             ]
@@ -1422,8 +2134,8 @@ inputsFromOtherDappAddresses = do
       , multiAcceptChangeOutputs = 
           [ [ ( Just activeDatum1
               , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySymbol "Active" 1
-            <> singleton optionsBeaconPolicySymbol targetId1 1
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
             <> lovelaceValueOf 100_000_000
               )
             ]
@@ -1454,14 +2166,16 @@ additionalProposedInputFromDappAddress = do
                           $ mockWalletPaymentPubKeyHash
                           $ knownWallet 5
       assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       assetsDatum2 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
@@ -1480,12 +2194,12 @@ additionalProposedInputFromDappAddress = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -1494,16 +2208,16 @@ additionalProposedInputFromDappAddress = do
 
   void $ waitUntilSlot 2
 
-  callEndpoint @"create-assets-utxo" h1 $
+  callEndpoint @"create-assets-utxo" h2 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr1
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
       , assetsInfo = 
           [ ( Just assetsDatum2
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -1513,7 +2227,7 @@ additionalProposedInputFromDappAddress = do
   void $ waitUntilSlot 4
 
   let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -1524,7 +2238,7 @@ additionalProposedInputFromDappAddress = do
         , expiration = slotToBeginPOSIXTime def 20
         }
       proposeDatum2 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -1539,12 +2253,12 @@ additionalProposedInputFromDappAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -1556,12 +2270,12 @@ additionalProposedInputFromDappAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -1570,11 +2284,11 @@ additionalProposedInputFromDappAddress = do
   void $ waitUntilSlot 8
 
   targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 100_000_000
                                )
   targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 50_000_000
                                )
 
@@ -1582,7 +2296,7 @@ additionalProposedInputFromDappAddress = do
   let targetId1 = txIdAsToken targetHash1
       targetId2 = txIdAsToken targetHash2
       activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -1594,7 +2308,7 @@ additionalProposedInputFromDappAddress = do
         , contractId = targetId1
         }
       activeDatum2 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -1606,26 +2320,26 @@ additionalProposedInputFromDappAddress = do
         , contractId = targetId2
         }
            
-  callEndpoint @"multi-accept-contracts" h2 $
+  callEndpoint @"accept-contract(s)" h2 $
     MultiAcceptParams
-      { multiAcceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
       , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
-      , multiAcceptBeaconPolicy = optionsBeaconPolicy
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
       , multiAcceptOptionsVal = optionsValidator
       , multiAcceptOptionsAddresses = [optionsAddr1]
       , multiAcceptSpecificUTxOs = 
           [ [ ( proposeDatum1
               , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySymbol "Proposed" 1
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
               )
             , ( assetsDatum1
               , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySymbol "Assets" 1
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
              <> lovelaceValueOf 100_000_000
               )
             , ( proposeDatum2
               , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySymbol "Proposed" 1
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
               )
             ]
           ]
@@ -1633,8 +2347,8 @@ additionalProposedInputFromDappAddress = do
       , multiAcceptChangeOutputs = 
           [ [ ( Just activeDatum1
               , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySymbol "Active" 1
-            <> singleton optionsBeaconPolicySymbol targetId1 1
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
             <> lovelaceValueOf 100_000_000
               )
             ]
@@ -1665,14 +2379,16 @@ additionalAssetsInputFromDappAddress = do
                           $ mockWalletPaymentPubKeyHash
                           $ knownWallet 5
       assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       assetsDatum2 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
@@ -1691,12 +2407,12 @@ additionalAssetsInputFromDappAddress = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -1709,12 +2425,12 @@ additionalAssetsInputFromDappAddress = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum2
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -1724,7 +2440,7 @@ additionalAssetsInputFromDappAddress = do
   void $ waitUntilSlot 4
 
   let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -1735,7 +2451,7 @@ additionalAssetsInputFromDappAddress = do
         , expiration = slotToBeginPOSIXTime def 20
         }
       proposeDatum2 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -1750,12 +2466,12 @@ additionalAssetsInputFromDappAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -1763,16 +2479,16 @@ additionalAssetsInputFromDappAddress = do
 
   void $ waitUntilSlot 6
 
-  callEndpoint @"propose-contract(s)" h1 $
+  callEndpoint @"propose-contract(s)" h2 $
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr1
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
       , proposeInfo = 
           [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -1781,11 +2497,11 @@ additionalAssetsInputFromDappAddress = do
   void $ waitUntilSlot 8
 
   targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 100_000_000
                                )
   targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 50_000_000
                                )
 
@@ -1793,7 +2509,7 @@ additionalAssetsInputFromDappAddress = do
   let targetId1 = txIdAsToken targetHash1
       targetId2 = txIdAsToken targetHash2
       activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -1805,7 +2521,7 @@ additionalAssetsInputFromDappAddress = do
         , contractId = targetId1
         }
       activeDatum2 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -1817,26 +2533,26 @@ additionalAssetsInputFromDappAddress = do
         , contractId = targetId2
         }
            
-  callEndpoint @"multi-accept-contracts" h2 $
+  callEndpoint @"accept-contract(s)" h2 $
     MultiAcceptParams
-      { multiAcceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
       , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
-      , multiAcceptBeaconPolicy = optionsBeaconPolicy
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
       , multiAcceptOptionsVal = optionsValidator
       , multiAcceptOptionsAddresses = [optionsAddr1]
       , multiAcceptSpecificUTxOs = 
           [ [ ( proposeDatum1
               , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySymbol "Proposed" 1
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
               )
             , ( assetsDatum1
               , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySymbol "Assets" 1
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
              <> lovelaceValueOf 100_000_000
               )
             , ( assetsDatum2
-              , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySymbol "Assets" 1
+              , lovelaceValueOf 5_000_000
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
              <> lovelaceValueOf 50_000_000
               )
             ]
@@ -1845,8 +2561,8 @@ additionalAssetsInputFromDappAddress = do
       , multiAcceptChangeOutputs = 
           [ [ ( Just activeDatum1
               , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySymbol "Active" 1
-            <> singleton optionsBeaconPolicySymbol targetId1 1
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
             <> lovelaceValueOf 100_000_000
               )
             ]
@@ -1877,14 +2593,16 @@ missingProposedInput = do
                           $ mockWalletPaymentPubKeyHash
                           $ knownWallet 5
       assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       assetsDatum2 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
@@ -1903,12 +2621,12 @@ missingProposedInput = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -1917,16 +2635,16 @@ missingProposedInput = do
 
   void $ waitUntilSlot 2
 
-  callEndpoint @"create-assets-utxo" h1 $
+  callEndpoint @"create-assets-utxo" h2 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr1
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
       , assetsInfo = 
           [ ( Just assetsDatum2
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -1936,7 +2654,7 @@ missingProposedInput = do
   void $ waitUntilSlot 4
 
   let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -1947,7 +2665,7 @@ missingProposedInput = do
         , expiration = slotToBeginPOSIXTime def 20
         }
       proposeDatum2 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -1962,12 +2680,12 @@ missingProposedInput = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -1975,16 +2693,16 @@ missingProposedInput = do
 
   void $ waitUntilSlot 6
 
-  callEndpoint @"propose-contract(s)" h1 $
+  callEndpoint @"propose-contract(s)" h2 $
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr1
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
       , proposeInfo = 
           [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -1993,11 +2711,11 @@ missingProposedInput = do
   void $ waitUntilSlot 8
 
   targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 100_000_000
                                )
   targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 50_000_000
                                )
 
@@ -2005,7 +2723,7 @@ missingProposedInput = do
   let targetId1 = txIdAsToken targetHash1
       targetId2 = txIdAsToken targetHash2
       activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -2017,7 +2735,7 @@ missingProposedInput = do
         , contractId = targetId1
         }
       activeDatum2 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -2029,17 +2747,17 @@ missingProposedInput = do
         , contractId = targetId2
         }
            
-  callEndpoint @"multi-accept-contracts" h2 $
+  callEndpoint @"accept-contract(s)" h2 $
     MultiAcceptParams
-      { multiAcceptBeaconsMinted = [("Active",1),("Assets",-1),(targetId1,2)]
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),(targetId1,2)]]
       , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
-      , multiAcceptBeaconPolicy = optionsBeaconPolicy
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
       , multiAcceptOptionsVal = optionsValidator
       , multiAcceptOptionsAddresses = [optionsAddr1]
       , multiAcceptSpecificUTxOs = 
           [ [ ( assetsDatum1
               , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySymbol "Assets" 1
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
              <> lovelaceValueOf 100_000_000
               )
             ]
@@ -2048,8 +2766,8 @@ missingProposedInput = do
       , multiAcceptChangeOutputs = 
           [ [ ( Just activeDatum1
               , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySymbol "Active" 1
-            <> singleton optionsBeaconPolicySymbol targetId1 1
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
             <> lovelaceValueOf 100_000_000
               )
             ]
@@ -2080,14 +2798,16 @@ missingAssetsInput = do
                           $ mockWalletPaymentPubKeyHash
                           $ knownWallet 5
       assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       assetsDatum2 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
@@ -2106,12 +2826,12 @@ missingAssetsInput = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -2120,16 +2840,16 @@ missingAssetsInput = do
 
   void $ waitUntilSlot 2
 
-  callEndpoint @"create-assets-utxo" h1 $
+  callEndpoint @"create-assets-utxo" h2 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr1
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
       , assetsInfo = 
           [ ( Just assetsDatum2
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -2139,7 +2859,7 @@ missingAssetsInput = do
   void $ waitUntilSlot 4
 
   let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -2150,7 +2870,7 @@ missingAssetsInput = do
         , expiration = slotToBeginPOSIXTime def 20
         }
       proposeDatum2 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -2165,12 +2885,12 @@ missingAssetsInput = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -2178,16 +2898,16 @@ missingAssetsInput = do
 
   void $ waitUntilSlot 6
 
-  callEndpoint @"propose-contract(s)" h1 $
+  callEndpoint @"propose-contract(s)" h2 $
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr1
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
       , proposeInfo = 
           [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -2196,11 +2916,11 @@ missingAssetsInput = do
   void $ waitUntilSlot 8
 
   targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 100_000_000
                                )
   targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 50_000_000
                                )
 
@@ -2208,7 +2928,7 @@ missingAssetsInput = do
   let targetId1 = txIdAsToken targetHash1
       targetId2 = txIdAsToken targetHash2
       activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -2220,7 +2940,7 @@ missingAssetsInput = do
         , contractId = targetId1
         }
       activeDatum2 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -2232,17 +2952,17 @@ missingAssetsInput = do
         , contractId = targetId2
         }
            
-  callEndpoint @"multi-accept-contracts" h2 $
+  callEndpoint @"accept-contract(s)" h2 $
     MultiAcceptParams
-      { multiAcceptBeaconsMinted = [("Active",1),("Proposed",-1),(targetId1,2)]
+      { multiAcceptBeaconsMinted = [[("Active",1),("Proposed",-1),(targetId1,2)]]
       , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
-      , multiAcceptBeaconPolicy = optionsBeaconPolicy
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
       , multiAcceptOptionsVal = optionsValidator
       , multiAcceptOptionsAddresses = [optionsAddr1]
       , multiAcceptSpecificUTxOs = 
           [ [ ( proposeDatum1
               , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySymbol "Proposed" 1
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
               )
             ]
           ]
@@ -2250,8 +2970,8 @@ missingAssetsInput = do
       , multiAcceptChangeOutputs = 
           [ [ ( Just activeDatum1
               , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySymbol "Active" 1
-            <> singleton optionsBeaconPolicySymbol targetId1 1
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
             <> lovelaceValueOf 100_000_000
               )
             ]
@@ -2282,14 +3002,16 @@ missingBothInputs = do
                           $ mockWalletPaymentPubKeyHash
                           $ knownWallet 5
       assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       assetsDatum2 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
@@ -2308,12 +3030,12 @@ missingBothInputs = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -2322,16 +3044,16 @@ missingBothInputs = do
 
   void $ waitUntilSlot 2
 
-  callEndpoint @"create-assets-utxo" h1 $
+  callEndpoint @"create-assets-utxo" h2 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr1
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
       , assetsInfo = 
           [ ( Just assetsDatum2
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -2341,7 +3063,7 @@ missingBothInputs = do
   void $ waitUntilSlot 4
 
   let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -2352,7 +3074,7 @@ missingBothInputs = do
         , expiration = slotToBeginPOSIXTime def 20
         }
       proposeDatum2 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -2367,12 +3089,12 @@ missingBothInputs = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -2380,16 +3102,16 @@ missingBothInputs = do
 
   void $ waitUntilSlot 6
 
-  callEndpoint @"propose-contract(s)" h1 $
+  callEndpoint @"propose-contract(s)" h2 $
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr1
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
       , proposeInfo = 
           [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -2398,11 +3120,11 @@ missingBothInputs = do
   void $ waitUntilSlot 8
 
   targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 100_000_000
                                )
   targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 50_000_000
                                )
 
@@ -2410,7 +3132,7 @@ missingBothInputs = do
   let targetId1 = txIdAsToken targetHash1
       targetId2 = txIdAsToken targetHash2
       activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -2422,7 +3144,7 @@ missingBothInputs = do
         , contractId = targetId1
         }
       activeDatum2 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -2434,11 +3156,11 @@ missingBothInputs = do
         , contractId = targetId2
         }
            
-  callEndpoint @"multi-accept-contracts" h2 $
+  callEndpoint @"accept-contract(s)" h2 $
     MultiAcceptParams
-      { multiAcceptBeaconsMinted = [("Active",1),(targetId1,2)]
+      { multiAcceptBeaconsMinted = [[("Active",1),(targetId1,2)]]
       , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
-      , multiAcceptBeaconPolicy = optionsBeaconPolicy
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
       , multiAcceptOptionsVal = optionsValidator
       , multiAcceptOptionsAddresses = [optionsAddr1]
       , multiAcceptSpecificUTxOs = 
@@ -2448,8 +3170,8 @@ missingBothInputs = do
       , multiAcceptChangeOutputs = 
           [ [ ( Just activeDatum1
               , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySymbol "Active" 1
-            <> singleton optionsBeaconPolicySymbol targetId1 1
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
             <> lovelaceValueOf 100_000_000
               )
             ]
@@ -2482,14 +3204,16 @@ additionalNonSignificantInputFromAddress = do
                           $ mockWalletPaymentPubKeyHash
                           $ knownWallet 5
       assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       assetsDatum2 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
@@ -2508,12 +3232,12 @@ additionalNonSignificantInputFromAddress = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -2522,16 +3246,16 @@ additionalNonSignificantInputFromAddress = do
 
   void $ waitUntilSlot 2
 
-  callEndpoint @"create-assets-utxo" h1 $
+  callEndpoint @"create-assets-utxo" h2 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr1
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
       , assetsInfo = 
           [ ( Just assetsDatum2
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -2541,7 +3265,7 @@ additionalNonSignificantInputFromAddress = do
   void $ waitUntilSlot 4
 
   let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -2552,7 +3276,7 @@ additionalNonSignificantInputFromAddress = do
         , expiration = slotToBeginPOSIXTime def 20
         }
       proposeDatum2 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -2567,12 +3291,12 @@ additionalNonSignificantInputFromAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -2580,16 +3304,16 @@ additionalNonSignificantInputFromAddress = do
 
   void $ waitUntilSlot 6
 
-  callEndpoint @"propose-contract(s)" h1 $
+  callEndpoint @"propose-contract(s)" h2 $
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr1
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
       , proposeInfo = 
           [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -2598,11 +3322,11 @@ additionalNonSignificantInputFromAddress = do
   void $ waitUntilSlot 8
 
   targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 100_000_000
                                )
   targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 50_000_000
                                )
 
@@ -2610,7 +3334,7 @@ additionalNonSignificantInputFromAddress = do
   let targetId1 = txIdAsToken targetHash1
       targetId2 = txIdAsToken targetHash2
       activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -2622,7 +3346,7 @@ additionalNonSignificantInputFromAddress = do
         , contractId = targetId1
         }
       activeDatum2 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -2633,12 +3357,12 @@ additionalNonSignificantInputFromAddress = do
         , expiration = slotToBeginPOSIXTime def 20
         , contractId = targetId2
         }
-
+  
   callEndpoint @"propose-contract(s)" h1 $
     ProposeParams
       { proposeBeaconsMinted = []
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just activeDatum1
@@ -2649,22 +3373,22 @@ additionalNonSignificantInputFromAddress = do
       }
 
   void $ waitUntilSlot 10
-           
-  callEndpoint @"multi-accept-contracts" h2 $
+
+  callEndpoint @"accept-contract(s)" h2 $
     MultiAcceptParams
-      { multiAcceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
       , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
-      , multiAcceptBeaconPolicy = optionsBeaconPolicy
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
       , multiAcceptOptionsVal = optionsValidator
       , multiAcceptOptionsAddresses = [optionsAddr1]
       , multiAcceptSpecificUTxOs = 
           [ [ ( proposeDatum1
               , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySymbol "Proposed" 1
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
               )
             , ( assetsDatum1
               , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySymbol "Assets" 1
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
              <> lovelaceValueOf 100_000_000
               )
             , ( activeDatum1
@@ -2676,8 +3400,8 @@ additionalNonSignificantInputFromAddress = do
       , multiAcceptChangeOutputs = 
           [ [ ( Just activeDatum1
               , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySymbol "Active" 1
-            <> singleton optionsBeaconPolicySymbol targetId1 1
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
             <> lovelaceValueOf 100_000_000
               )
             ]
@@ -2708,14 +3432,16 @@ contractIdDoesntMatchAssetsUTxO = do
                           $ mockWalletPaymentPubKeyHash
                           $ knownWallet 5
       assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       assetsDatum2 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
@@ -2734,12 +3460,12 @@ contractIdDoesntMatchAssetsUTxO = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr1
       , assetsInfo = 
           [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -2752,12 +3478,12 @@ contractIdDoesntMatchAssetsUTxO = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = optionsAddr2
       , assetsInfo = 
           [ ( Just assetsDatum2
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -2767,7 +3493,7 @@ contractIdDoesntMatchAssetsUTxO = do
   void $ waitUntilSlot 4
 
   let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -2778,7 +3504,7 @@ contractIdDoesntMatchAssetsUTxO = do
         , expiration = slotToBeginPOSIXTime def 20
         }
       proposeDatum2 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -2793,12 +3519,12 @@ contractIdDoesntMatchAssetsUTxO = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr1
       , proposeInfo = 
           [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -2810,12 +3536,12 @@ contractIdDoesntMatchAssetsUTxO = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = optionsAddr2
       , proposeInfo = 
           [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -2824,11 +3550,11 @@ contractIdDoesntMatchAssetsUTxO = do
   void $ waitUntilSlot 8
 
   targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 100_000_000
                                )
   targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySymbol "Assets" 1
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
                               <> lovelaceValueOf 50_000_000
                                )
 
@@ -2836,7 +3562,7 @@ contractIdDoesntMatchAssetsUTxO = do
   let targetId1 = txIdAsToken targetHash1
       targetId2 = txIdAsToken targetHash2
       activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -2848,7 +3574,7 @@ contractIdDoesntMatchAssetsUTxO = do
         , contractId = targetId1
         }
       activeDatum2 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
         , desiredAsset = testToken1
@@ -2860,21 +3586,21 @@ contractIdDoesntMatchAssetsUTxO = do
         , contractId = targetId2
         }
            
-  callEndpoint @"multi-accept-contracts" h2 $
+  callEndpoint @"accept-contract(s)" h2 $
     MultiAcceptParams
-      { multiAcceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId2,2)]
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId2,2)]]
       , multiAcceptBeaconRedeemer = MintActiveBeacon targetId2 optionsStakingCred1
-      , multiAcceptBeaconPolicy = optionsBeaconPolicy
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
       , multiAcceptOptionsVal = optionsValidator
       , multiAcceptOptionsAddresses = [optionsAddr1]
       , multiAcceptSpecificUTxOs = 
           [ [ ( proposeDatum1
               , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySymbol "Proposed" 1
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
               )
             , ( assetsDatum1
               , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySymbol "Assets" 1
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
              <> lovelaceValueOf 100_000_000
               )
             ]
@@ -2883,8 +3609,217 @@ contractIdDoesntMatchAssetsUTxO = do
       , multiAcceptChangeOutputs = 
           [ [ ( Just activeDatum1
               , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySymbol "Active" 1
-            <> singleton optionsBeaconPolicySymbol targetId2 1
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId2 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
+          ]
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
+      }
+
+contractIDsDontMatchRedeemer :: EmulatorTrace ()
+contractIDsDontMatchRedeemer = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+  h2 <- activateContractWallet (knownWallet 5) endpoints
+
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
+      , assetsInfo = 
+          [ ( Just assetsDatum1
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum1
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 6
+
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
+        }
+           
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId2,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
+          ]
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId2 1
             <> lovelaceValueOf 100_000_000
               )
             ]
@@ -2906,28 +3841,49 @@ differentBeaconSymbolsInTokenName = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -2936,14 +3892,42 @@ differentBeaconSymbolsInTokenName = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -2954,9 +3938,9 @@ differentBeaconSymbolsInTokenName = do
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
       , proposeBeaconPolicy = alwaysSucceedPolicy
-      , proposeAddress = optionsAddr
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
            <> singleton (scriptCurrencySymbol alwaysSucceedPolicy) "Proposed" 1
            )
@@ -2964,185 +3948,101 @@ differentBeaconSymbolsInTokenName = do
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
-
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
-        }
-           
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton (scriptCurrencySymbol alwaysSucceedPolicy) "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
-          ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
-      }
-
-differentCurrentAssets :: EmulatorTrace ()
-differentCurrentAssets = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = testToken1
-        , currentAssetQuantity = 10
-        }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
-      , assetsInfo = 
-          [ ( Just assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> (uncurry singleton testToken1) 10
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
+  callEndpoint @"propose-contract(s)" h2 $
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum2
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 8
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> (uncurry singleton testToken1) 10
-                              )
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> (uncurry singleton testToken1) 10
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton (scriptCurrencySymbol alwaysSucceedPolicy) "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 differentCurrentAssetQuantity :: EmulatorTrace ()
@@ -3150,29 +4050,50 @@ differentCurrentAssetQuantity = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 50_000_000
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
             )
           ]
       , assetsAsInline = True
@@ -3180,14 +4101,42 @@ differentCurrentAssetQuantity = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -3197,74 +4146,112 @@ differentCurrentAssetQuantity = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 50_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 50_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum2
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 wrongRedeemerStakingCredential :: EmulatorTrace ()
@@ -3272,32 +4259,49 @@ wrongRedeemerStakingCredential = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
       optionsStakingCred2 = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 2
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -3306,14 +4310,42 @@ wrongRedeemerStakingCredential = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -3323,74 +4355,112 @@ wrongRedeemerStakingCredential = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred2
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred2
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 minDepositNotPaidToCreator :: EmulatorTrace ()
@@ -3398,28 +4468,49 @@ minDepositNotPaidToCreator = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -3428,14 +4519,42 @@ minDepositNotPaidToCreator = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -3445,73 +4564,111 @@ minDepositNotPaidToCreator = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 premiumNotPaidToCreator :: EmulatorTrace ()
@@ -3519,28 +4676,49 @@ premiumNotPaidToCreator = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -3549,14 +4727,42 @@ premiumNotPaidToCreator = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -3566,73 +4772,111 @@ premiumNotPaidToCreator = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            , lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              , lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 premiumPaidToWrongAddress :: EmulatorTrace ()
@@ -3640,28 +4884,49 @@ premiumPaidToWrongAddress = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -3670,14 +4935,42 @@ premiumPaidToWrongAddress = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -3687,74 +4980,112 @@ premiumPaidToWrongAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr{addressStakingCredential = Just $ StakingHash optionsStakingCred}
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr2]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 premiumSplitOverMultipleOutputs :: EmulatorTrace ()
@@ -3762,28 +5093,49 @@ premiumSplitOverMultipleOutputs = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -3792,14 +5144,42 @@ premiumSplitOverMultipleOutputs = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -3809,76 +5189,114 @@ premiumSplitOverMultipleOutputs = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            , lovelaceValueOf 10_000_000
-            )
-          , ( Nothing
-            , lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              )
+            , ( Nothing
+              , lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 missingOptionsOutput :: EmulatorTrace ()
@@ -3886,28 +5304,49 @@ missingOptionsOutput = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -3916,14 +5355,42 @@ missingOptionsOutput = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -3933,69 +5400,106 @@ missingOptionsOutput = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
           [
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 optionsOutputToDifferentDappAddress :: EmulatorTrace ()
@@ -4003,32 +5507,49 @@ optionsOutputToDifferentDappAddress = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
       optionsStakingCred2 = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 2
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -4037,14 +5558,42 @@ optionsOutputToDifferentDappAddress = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -4054,74 +5603,112 @@ optionsOutputToDifferentDappAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr{addressStakingCredential = Just $ StakingHash optionsStakingCred2}
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr2]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 multipleOutputsToDappAddress :: EmulatorTrace ()
@@ -4129,28 +5716,49 @@ multipleOutputsToDappAddress = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -4159,14 +5767,42 @@ multipleOutputsToDappAddress = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -4176,77 +5812,115 @@ multipleOutputsToDappAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
-          , ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            , ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 activeOutputMissingMinDeposit :: EmulatorTrace ()
@@ -4254,28 +5928,49 @@ activeOutputMissingMinDeposit = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -4284,14 +5979,42 @@ activeOutputMissingMinDeposit = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -4301,73 +6024,111 @@ activeOutputMissingMinDeposit = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 activeOutputMissingCurrentAsset :: EmulatorTrace ()
@@ -4375,28 +6136,49 @@ activeOutputMissingCurrentAsset = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -4405,14 +6187,42 @@ activeOutputMissingCurrentAsset = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -4422,73 +6232,111 @@ activeOutputMissingCurrentAsset = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 activeOutputMissingActiveBeacon :: EmulatorTrace ()
@@ -4496,28 +6344,49 @@ activeOutputMissingActiveBeacon = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -4526,14 +6395,42 @@ activeOutputMissingActiveBeacon = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -4543,73 +6440,111 @@ activeOutputMissingActiveBeacon = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 activeOutputMissingContractId :: EmulatorTrace ()
@@ -4617,28 +6552,49 @@ activeOutputMissingContractId = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -4647,14 +6603,42 @@ activeOutputMissingContractId = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -4664,73 +6648,111 @@ activeOutputMissingContractId = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 activeOutputHasBothContractIds :: EmulatorTrace ()
@@ -4738,28 +6760,49 @@ activeOutputHasBothContractIds = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -4768,14 +6811,42 @@ activeOutputHasBothContractIds = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -4785,74 +6856,112 @@ activeOutputHasBothContractIds = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 2
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 2
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongBeaconSymbol :: EmulatorTrace ()
@@ -4860,28 +6969,49 @@ datumHasWrongBeaconSymbol = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -4890,14 +7020,42 @@ datumHasWrongBeaconSymbol = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -4907,74 +7065,112 @@ datumHasWrongBeaconSymbol = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
         { beaconSymbol = adaSymbol
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongCurrentAsset :: EmulatorTrace ()
@@ -4982,28 +7178,49 @@ datumHasWrongCurrentAsset = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -5012,14 +7229,42 @@ datumHasWrongCurrentAsset = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -5029,74 +7274,112 @@ datumHasWrongCurrentAsset = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = testToken1
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongCurrentAssetQuantity :: EmulatorTrace ()
@@ -5104,28 +7387,49 @@ datumHasWrongCurrentAssetQuantity = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -5134,14 +7438,42 @@ datumHasWrongCurrentAssetQuantity = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -5151,74 +7483,112 @@ datumHasWrongCurrentAssetQuantity = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 10_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongDesiredAsset :: EmulatorTrace ()
@@ -5226,28 +7596,49 @@ datumHasWrongDesiredAsset = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -5256,14 +7647,42 @@ datumHasWrongDesiredAsset = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -5273,74 +7692,112 @@ datumHasWrongDesiredAsset = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken2
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongStrikePrice :: EmulatorTrace ()
@@ -5348,28 +7805,49 @@ datumHasWrongStrikePrice = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -5378,14 +7856,42 @@ datumHasWrongStrikePrice = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -5395,74 +7901,112 @@ datumHasWrongStrikePrice = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 1
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongCreatorAddress :: EmulatorTrace ()
@@ -5470,28 +8014,49 @@ datumHasWrongCreatorAddress = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -5500,14 +8065,42 @@ datumHasWrongCreatorAddress = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -5517,74 +8110,112 @@ datumHasWrongCreatorAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = optionsAddr
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongPremiumAsset :: EmulatorTrace ()
@@ -5592,28 +8223,49 @@ datumHasWrongPremiumAsset = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -5622,14 +8274,42 @@ datumHasWrongPremiumAsset = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -5639,74 +8319,112 @@ datumHasWrongPremiumAsset = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = testToken1
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongPremium :: EmulatorTrace ()
@@ -5714,28 +8432,49 @@ datumHasWrongPremium = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -5744,14 +8483,42 @@ datumHasWrongPremium = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -5761,74 +8528,112 @@ datumHasWrongPremium = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 1_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongExpiration :: EmulatorTrace ()
@@ -5836,28 +8641,49 @@ datumHasWrongExpiration = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -5866,14 +8692,42 @@ datumHasWrongExpiration = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -5883,74 +8737,112 @@ datumHasWrongExpiration = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 230
-        , contractId = targetId
+        , expiration = slotToBeginPOSIXTime def 30
+        , contractId = targetId1
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 datumHasWrongContractId :: EmulatorTrace ()
@@ -5958,28 +8850,49 @@ datumHasWrongContractId = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
   h2 <- activateContractWallet (knownWallet 5) endpoints
 
-  let optionsStakingCred = PubKeyCredential
-                         $ unPaymentPubKeyHash
-                         $ mockWalletPaymentPubKeyHash
-                         $ knownWallet 1
-      assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  let optionsStakingCred1 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 1
+      optionsStakingCred2 = PubKeyCredential
+                          $ unPaymentPubKeyHash
+                          $ mockWalletPaymentPubKeyHash
+                          $ knownWallet 5
+      assetsDatum1 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
-      optionsAddr = Address (ScriptCredential optionsValidatorHash)
-                            (Just $ StakingHash optionsStakingCred)
+      assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        }
+      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred1)
+      optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
+                             (Just $ StakingHash optionsStakingCred2)
+      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr2 = 
+        Address ( PubKeyCredential 
+                $ unPaymentPubKeyHash 
+                $ mockWalletPaymentPubKeyHash 
+                $ knownWallet 1
+                ) 
+                Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
-      , assetsAddress = optionsAddr
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr1
       , assetsInfo = 
-          [ ( Just assetsDatum
+          [ ( Just assetsDatum1
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -5988,14 +8901,42 @@ datumHasWrongContractId = do
 
   void $ waitUntilSlot 2
 
-  let creatorAddr = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-      proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  callEndpoint @"create-assets-utxo" h2 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = optionsAddr2
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 50_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  let proposeDatum1 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        }
+      proposeDatum2 = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
@@ -6005,74 +8946,112 @@ datumHasWrongContractId = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = optionsAddr
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr1
       , proposeInfo = 
-          [ ( Just proposeDatum
+          [ ( Just proposeDatum1
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
       }
 
-  void $ waitUntilSlot 4
+  void $ waitUntilSlot 6
 
-  targetHash <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                             <> singleton optionsBeaconPolicySymbol "Assets" 1
-                             <> lovelaceValueOf 100_000_000
-                              )
+  callEndpoint @"propose-contract(s)" h2 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = optionsAddr2
+      , proposeInfo = 
+          [ ( Just proposeDatum2
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
 
-  let targetId = txIdAsToken targetHash
-      activeDatum = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+  void $ waitUntilSlot 8
+
+  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 100_000_000
+                               )
+  targetHash2 <- txIdWithValue ( lovelaceValueOf 5_000_000 
+                              <> singleton optionsBeaconPolicySym1 "Assets" 1
+                              <> lovelaceValueOf 50_000_000
+                               )
+
+
+  let targetId1 = txIdAsToken targetHash1
+      targetId2 = txIdAsToken targetHash2
+      activeDatum1 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = creatorAddr
+        , creatorAddress = creatorAddr1
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 20
-        , contractId = "Active"
+        , contractId = targetId2
+        }
+      activeDatum2 = ActiveContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 50_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = creatorAddr2
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 20
+        , contractId = targetId2
         }
            
-  callEndpoint @"accept-contract" h2 $
-    AcceptParams
-      { acceptBeaconsMinted = [("Active",1),("Assets",-1),("Proposed",-1),(targetId,2)]
-      , acceptBeaconRedeemer = MintActiveBeacon targetId optionsStakingCred
-      , acceptBeaconPolicy = optionsBeaconPolicy
-      , acceptOptionsVal = optionsValidator
-      , acceptOptionsAddress = optionsAddr
-      , acceptSpecificUTxOs = 
-          [ ( proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( assetsDatum
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
+  callEndpoint @"accept-contract(s)" h2 $
+    MultiAcceptParams
+      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
+      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
+      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
+      , multiAcceptOptionsVal = optionsValidator
+      , multiAcceptOptionsAddresses = [optionsAddr1]
+      , multiAcceptSpecificUTxOs = 
+          [ [ ( proposeDatum1
+              , lovelaceValueOf 3_000_000 
+             <> singleton optionsBeaconPolicySym1 "Proposed" 1
+              )
+            , ( assetsDatum1
+              , lovelaceValueOf 5_000_000 
+             <> singleton optionsBeaconPolicySym1 "Assets" 1
+             <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptChangeAddress = optionsAddr
-      , acceptChangeOutput = 
-          [ ( Just activeDatum
-            , lovelaceValueOf 5_000_000
-           <> singleton optionsBeaconPolicySymbol "Active" 1
-           <> singleton optionsBeaconPolicySymbol targetId 1
-           <> lovelaceValueOf 100_000_000
-            )
+      , multiAcceptChangeAddresses = [optionsAddr1]
+      , multiAcceptChangeOutputs = 
+          [ [ ( Just activeDatum1
+              , lovelaceValueOf 5_000_000
+            <> singleton optionsBeaconPolicySym1 "Active" 1
+            <> singleton optionsBeaconPolicySym1 targetId1 1
+            <> lovelaceValueOf 100_000_000
+              )
+            ]
           ]
-      , acceptPremiumAddress = creatorAddr
-      , acceptPremiumOutput = 
-          [ ( Nothing
-            ,  lovelaceValueOf 10_000_000
-            <> lovelaceValueOf 3_000_000
-            )
+      , multiAcceptPremiumAddresses = [creatorAddr1]
+      , multiAcceptPremiumOutput = 
+          [ [ ( Nothing
+              ,  lovelaceValueOf 10_000_000
+              <> lovelaceValueOf 3_000_000
+              )
+            ]
           ]
-      , acceptDatumAsInline = True
-      , acceptWithTTL = True
+      , multiAcceptDatumAsInline = True
+      , multiAcceptWithTTL = True
       }
 
 -------------------------------------------------
@@ -6096,11 +9075,13 @@ tests = do
         (Test.not assertNoFailedTransactions) additionalContractIDsMinted
     , checkPredicateOptions opts "Fail if additional tokens minted"
         (Test.not assertNoFailedTransactions) additionalTokensMinted
-    , checkPredicateOptions opts "Fail if there are inputs from other dApp addresses"
-        (Test.not assertNoFailedTransactions) inputsFromOtherDappAddresses
-    , checkPredicateOptions opts "Fail if there are more than one Proposed inputs from address"
+    , checkPredicateOptions opts "Fail if contracts being accepted from multiple addresses"
+        (Test.not assertNoFailedTransactions) acceptDifferentContractsFromDifferentAddressses
+    , checkPredicateOptions opts "Fail if similar contracts being accepted from multiple addresses"
+        (Test.not assertNoFailedTransactions) acceptSameContractsFromOtherAddressesWithDoubleSatisfaction
+    , checkPredicateOptions opts "Fail if additional Proposal inputs from dApp address"
         (Test.not assertNoFailedTransactions) additionalProposedInputFromDappAddress
-    , checkPredicateOptions opts "Fail if there are more than one Assets inputs from address"
+    , checkPredicateOptions opts "Fail if addtional Assets inputs from dApp address"
         (Test.not assertNoFailedTransactions) additionalAssetsInputFromDappAddress
     , checkPredicateOptions opts "Fail if Proposed UTxO is missing from inputs"
         (Test.not assertNoFailedTransactions) missingProposedInput
@@ -6112,10 +9093,10 @@ tests = do
         (Test.not assertNoFailedTransactions) additionalNonSignificantInputFromAddress
     , checkPredicateOptions opts "Fail if ContractID does not match Assets input tx hash"
         (Test.not assertNoFailedTransactions) contractIdDoesntMatchAssetsUTxO
-    , checkPredicateOptions opts "Fail if token uses different policy id"
+    , checkPredicateOptions opts "Fail if minted ContractIDs don't match redeemer"
+        (Test.not assertNoFailedTransactions) contractIDsDontMatchRedeemer
+    , checkPredicateOptions opts "Fail if token uses a different policy id"
         (Test.not assertNoFailedTransactions) differentBeaconSymbolsInTokenName
-    , checkPredicateOptions opts "Fail if datums don't agree on currentAsset"
-        (Test.not assertNoFailedTransactions) differentCurrentAssets
     , checkPredicateOptions opts "Fail if datums don't agree on currentAssetQuantity"
         (Test.not assertNoFailedTransactions) differentCurrentAssetQuantity
     , checkPredicateOptions opts "Fail if redeemer has wrong staking credential"
@@ -6164,12 +9145,10 @@ tests = do
         (Test.not assertNoFailedTransactions) datumHasWrongExpiration
     , checkPredicateOptions opts "Fail if ActiveContract datum has wrong contractId"
         (Test.not assertNoFailedTransactions) datumHasWrongContractId
-    
+      
     , checkPredicateOptions opts "Successfully accept contract"
-        assertNoFailedTransactions successfullyAcceptContract
-    , checkPredicateOptions opts "Successfully use multiAccept model"
-        assertNoFailedTransactions successfullyUseMultiAcceptContract
+        assertNoFailedTransactions successfullyAcceptSingleContract
     ]
 
 testTrace :: IO ()
-testTrace = runEmulatorTraceIO' def emConfig activeOutputHasBothContractIds
+testTrace = runEmulatorTraceIO' def emConfig wrongRedeemerStakingCredential

@@ -43,9 +43,10 @@ successfullyCreateAssetsUTxO = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -58,12 +59,12 @@ successfullyCreateAssetsUTxO = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -75,9 +76,10 @@ mintMoreThanOneAssetsBeacon = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -90,12 +92,12 @@ mintMoreThanOneAssetsBeacon = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",2)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 2
+           <> singleton optionsBeaconPolicySym1 "Assets" 2
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -107,9 +109,10 @@ mintTokenWithDifferentName = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -122,12 +125,12 @@ mintTokenWithDifferentName = do
     AssetsParams
       { assetsBeaconsMinted = [("Asts",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Asts" 1
+           <> singleton optionsBeaconPolicySym1 "Asts" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -139,9 +142,10 @@ mintAdditionalTokens = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -154,12 +158,12 @@ mintAdditionalTokens = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1),("Other",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -171,9 +175,10 @@ burnOtherTokens = do
   h1 <- activateContractWallet (knownWallet 3) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -186,12 +191,12 @@ burnOtherTokens = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1),("Proposed",-1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -203,9 +208,10 @@ beaconGoesToNonDappAddress = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential alwaysSucceedValidatorHash)
                      (Just $ StakingHash
@@ -218,12 +224,12 @@ beaconGoesToNonDappAddress = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -235,9 +241,10 @@ beaconGoesToNonStakingDappAddress = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      Nothing
@@ -246,12 +253,12 @@ beaconGoesToNonStakingDappAddress = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -263,9 +270,10 @@ receivingAddressDidNotApprove = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -278,12 +286,12 @@ receivingAddressDidNotApprove = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -298,6 +306,7 @@ datumHasWrongBeaconSymbol = do
         { beaconSymbol = adaSymbol
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -310,12 +319,45 @@ datumHasWrongBeaconSymbol = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+           )
+          ]
+      , assetsAsInline = True
+      }
+
+datumHasWrongCurrentAsset :: EmulatorTrace ()
+datumHasWrongCurrentAsset = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let assetsDatum = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = testToken1
+        , currentAssetQuantity = 10
+        , desiredAsset = testToken1
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = addr
+      , assetsInfo = 
+          [ ( Just assetsDatum
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -327,9 +369,10 @@ datumHasNegativeQuantity = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = -100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -342,12 +385,45 @@ datumHasNegativeQuantity = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+           )
+          ]
+      , assetsAsInline = True
+      }
+
+datumHasWrongDesiredAsset :: EmulatorTrace ()
+datumHasWrongDesiredAsset = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let assetsDatum = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken2
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = addr
+      , assetsInfo = 
+          [ ( Just assetsDatum
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -359,7 +435,7 @@ datumIsNotAssetsForContract = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -380,12 +456,12 @@ datumIsNotAssetsForContract = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -397,9 +473,10 @@ datumIsNotInline = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -412,12 +489,12 @@ datumIsNotInline = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            )
           ]
@@ -429,9 +506,10 @@ beaconStoredWithWrongCurrentAssetValue = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -444,12 +522,12 @@ beaconStoredWithWrongCurrentAssetValue = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 10_000_000
            )
           ]
@@ -461,9 +539,10 @@ beaconStoredWithAdditionalValue = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -476,12 +555,12 @@ beaconStoredWithAdditionalValue = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
            <> (uncurry singleton testToken1) 10
            )
@@ -494,9 +573,10 @@ beaconNotStoredWithMinDeposit = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym4
         , currentAsset = testToken1
         , currentAssetQuantity = 10
+        , desiredAsset = testToken2
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -509,12 +589,12 @@ beaconNotStoredWithMinDeposit = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy4
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 4_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym4 "Assets" 1
            <> (uncurry singleton testToken1) 10
            )
           ]
@@ -526,9 +606,10 @@ successfullyUseNonAdaAsset = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym4
         , currentAsset = testToken1
         , currentAssetQuantity = 10
+        , desiredAsset = testToken2
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -541,13 +622,46 @@ successfullyUseNonAdaAsset = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy4
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym4 "Assets" 1
            <> (uncurry singleton testToken1) 10
+           )
+          ]
+      , assetsAsInline = True
+      }
+
+wrongPairPolicyUsed :: EmulatorTrace ()
+wrongPairPolicyUsed = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let assetsDatum = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym4
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy4
+      , assetsAddress = addr
+      , assetsInfo = 
+          [ ( Just assetsDatum
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym4 "Assets" 1
+           <> lovelaceValueOf 100_000_000
            )
           ]
       , assetsAsInline = True
@@ -576,8 +690,12 @@ tests = do
         (Test.not assertNoFailedTransactions) receivingAddressDidNotApprove
     , checkPredicateOptions opts "Fail if AssetsForContract datum has wrong beacon symbol"
         (Test.not assertNoFailedTransactions) datumHasWrongBeaconSymbol
+    , checkPredicateOptions opts "Fail if AssetsForContract datum has wrong currentAsset"
+        (Test.not assertNoFailedTransactions) datumHasWrongCurrentAsset
     , checkPredicateOptions opts "Fail if AssetsForContract datum has negative quantity"
         (Test.not assertNoFailedTransactions) datumHasNegativeQuantity
+    , checkPredicateOptions opts "Fail if AssetsForContract datum has wrong desiredAsset"
+        (Test.not assertNoFailedTransactions) datumHasWrongDesiredAsset
     , checkPredicateOptions opts "Fail if beacon not stored with AssetsForContract datum"
         (Test.not assertNoFailedTransactions) datumIsNotAssetsForContract
     , checkPredicateOptions opts "Fail if datum is not inline datum"
@@ -588,6 +706,8 @@ tests = do
         (Test.not assertNoFailedTransactions) beaconStoredWithAdditionalValue
     , checkPredicateOptions opts "Fail if beacon not stored with minimum ADA deposit"
         (Test.not assertNoFailedTransactions) beaconNotStoredWithMinDeposit
+    , checkPredicateOptions opts "Fail if policy for different trading pair used"
+        (Test.not assertNoFailedTransactions) wrongPairPolicyUsed
 
     , checkPredicateOptions opts "Successfully create Assets UTxO"
         assertNoFailedTransactions successfullyCreateAssetsUTxO
@@ -596,4 +716,4 @@ tests = do
     ]
 
 testTrace :: IO ()
-testTrace = runEmulatorTraceIO' def emConfig successfullyUseNonAdaAsset
+testTrace = runEmulatorTraceIO' def emConfig wrongPairPolicyUsed

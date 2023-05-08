@@ -44,7 +44,7 @@ successfullyProposeSingleContract = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -65,12 +65,12 @@ successfullyProposeSingleContract = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -81,7 +81,7 @@ successfullyProposeMultipleContracts = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -102,16 +102,16 @@ successfullyProposeMultipleContracts = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",2)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           , ( Just proposeDatum{premium = 5_000_000}
             , lovelaceValueOf 3_000_000
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       , proposeAsInline = True
@@ -122,7 +122,7 @@ mintTokenWithDifferentName = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -143,12 +143,12 @@ mintTokenWithDifferentName = do
     ProposeParams
       { proposeBeaconsMinted = [("Prosed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Prosed" 1
+           <> singleton optionsBeaconPolicySym1 "Prosed" 1
            )
           ]
       , proposeAsInline = True
@@ -159,7 +159,7 @@ mintAdditionalTokens = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -180,12 +180,12 @@ mintAdditionalTokens = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1),("Other",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -196,7 +196,7 @@ burnOtherTokens = do
   h1 <- activateContractWallet (knownWallet 4) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -217,12 +217,12 @@ burnOtherTokens = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1),("Active",-1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -233,7 +233,7 @@ beaconGoesToNonDappAddress = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -254,12 +254,12 @@ beaconGoesToNonDappAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -270,7 +270,7 @@ atLeastOneBeaconGoesToNonDappAddress = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -291,12 +291,12 @@ atLeastOneBeaconGoesToNonDappAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",2)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       , proposeAsInline = True
@@ -307,7 +307,7 @@ beaconGoesToNonStakingDappAddress = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -324,12 +324,12 @@ beaconGoesToNonStakingDappAddress = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -340,7 +340,7 @@ receivingAddressDidNotApprove = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -361,12 +361,12 @@ receivingAddressDidNotApprove = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -398,12 +398,49 @@ datumHasWrongBeaconSymbol = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+datumHasWrongCurrentAsset :: EmulatorTrace ()
+datumHasWrongCurrentAsset = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let proposeDatum = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = testToken1
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 10
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = addr
+      , proposeInfo = 
+          [ ( Just proposeDatum
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -414,7 +451,7 @@ datumHasNegativeQuantity = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = -100_000_000
         , desiredAsset = testToken1
@@ -435,12 +472,12 @@ datumHasNegativeQuantity = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -451,7 +488,7 @@ datumHasNegativeStrikePrice = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -472,12 +509,12 @@ datumHasNegativeStrikePrice = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -488,7 +525,7 @@ datumHasNegativePremium = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -509,12 +546,12 @@ datumHasNegativePremium = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -525,7 +562,7 @@ datumHasNegativeTime = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -546,12 +583,49 @@ datumHasNegativeTime = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+datumHasWrongDesiredAsset :: EmulatorTrace ()
+datumHasWrongDesiredAsset = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let proposeDatum = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken2
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 10
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = addr
+      , proposeInfo = 
+          [ ( Just proposeDatum
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -562,9 +636,10 @@ datumIsNotProposedContract = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -577,12 +652,12 @@ datumIsNotProposedContract = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -593,7 +668,7 @@ datumIsNotInline = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -614,93 +689,15 @@ datumIsNotInline = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = False
-      }
-
-singleContractNotStoredWithMinDeposit :: EmulatorTrace ()
-singleContractNotStoredWithMinDeposit = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-
-  let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 10
-        }
-      addr = Address (ScriptCredential optionsValidatorHash)
-                     (Just $ StakingHash
-                           $ PubKeyCredential
-                           $ unPaymentPubKeyHash
-                           $ mockWalletPaymentPubKeyHash
-                           $ knownWallet 1)
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = addr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 2_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-atLeastOneContractNotStoredWithMinDeposit :: EmulatorTrace ()
-atLeastOneContractNotStoredWithMinDeposit = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-
-  let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 10
-        }
-      addr = Address (ScriptCredential optionsValidatorHash)
-                     (Just $ StakingHash
-                           $ PubKeyCredential
-                           $ unPaymentPubKeyHash
-                           $ mockWalletPaymentPubKeyHash
-                           $ knownWallet 1)
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",2)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
-      , proposeAddress = addr
-      , proposeInfo = 
-          [ ( Just proposeDatum
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          , ( Just proposeDatum{premium = 5_000_000}
-            , lovelaceValueOf 2_000_000
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
-            )
-          ]
-      , proposeAsInline = True
       }
 
 atLeastOneDatumNotProposedContact :: EmulatorTrace ()
@@ -708,7 +705,7 @@ atLeastOneDatumNotProposedContact = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -719,9 +716,10 @@ atLeastOneDatumNotProposedContact = do
         , expiration = slotToBeginPOSIXTime def 10
         }
       otherDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -734,16 +732,94 @@ atLeastOneDatumNotProposedContact = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",2)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           , ( Just otherDatum
             , lovelaceValueOf 3_000_000
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+            )
+          ]
+      , proposeAsInline = True
+      }
+
+singleContractNotStoredWithMinDeposit :: EmulatorTrace ()
+singleContractNotStoredWithMinDeposit = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let proposeDatum = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 10
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",1)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = addr
+      , proposeInfo = 
+          [ ( Just proposeDatum
+            , lovelaceValueOf 2_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+           )
+          ]
+      , proposeAsInline = True
+      }
+
+atLeastOneContractNotStoredWithMinDeposit :: EmulatorTrace ()
+atLeastOneContractNotStoredWithMinDeposit = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let proposeDatum = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 10
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",2)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = addr
+      , proposeInfo = 
+          [ ( Just proposeDatum
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
+            )
+          , ( Just proposeDatum{premium = 5_000_000}
+            , lovelaceValueOf 2_000_000
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
             )
           ]
       , proposeAsInline = True
@@ -754,7 +830,7 @@ burnRedeemerUsedToMint = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -775,12 +851,12 @@ burnRedeemerUsedToMint = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = BurnBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -809,8 +885,12 @@ tests = do
         (Test.not assertNoFailedTransactions) receivingAddressDidNotApprove
     , checkPredicateOptions opts "Fail if ProposedContract datum has wrong beacon symbol"
         (Test.not assertNoFailedTransactions) datumHasWrongBeaconSymbol
-    , checkPredicateOptions opts "Fail if ProposedContract datum has negative current assets quantity"
+    , checkPredicateOptions opts "Fail if ProposedContract datum has wrong currentAsset"
+        (Test.not assertNoFailedTransactions) datumHasWrongCurrentAsset
+    , checkPredicateOptions opts "Fail if ProposedContract datum has negative currentAssetQuantity"
         (Test.not assertNoFailedTransactions) datumHasNegativeQuantity
+    , checkPredicateOptions opts "Fail if datum has wrong desiredAsset"
+        (Test.not assertNoFailedTransactions) datumHasWrongDesiredAsset
     , checkPredicateOptions opts "Fail if ProposedContract datum has negative strikePrice"
         (Test.not assertNoFailedTransactions) datumHasNegativeStrikePrice
     , checkPredicateOptions opts "Fail if ProposedContract datum has negative premium"

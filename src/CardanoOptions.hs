@@ -18,6 +18,7 @@
 
 module CardanoOptions
 (
+  OptionsConfig(..),
   OptionsDatum(..),
   OptionsRedeemer(..),
   OptionsBeaconRedeemer(..),
@@ -86,23 +87,24 @@ data OptionsConfig = OptionsConfig
 
 data OptionsDatum 
   = AssetsForContract -- ^ The datum for the UTxO containing the assets for the contract.
-      { beaconSymbol :: CurrencySymbol -- ^ Policy Id for the options beaocn policy.
+      { beaconSymbol :: CurrencySymbol -- ^ Policy Id for the relevant options beacon policy.
       , currentAsset :: (CurrencySymbol,TokenName)
       , currentAssetQuantity :: Integer
+      , desiredAsset :: (CurrencySymbol,TokenName)
       }
   | ProposedContract
-      { beaconSymbol :: CurrencySymbol -- ^ Policy Id for the options beacon policy.
+      { beaconSymbol :: CurrencySymbol -- ^ Policy Id for the relevant options beacon policy.
       , currentAsset :: (CurrencySymbol,TokenName)
       , currentAssetQuantity :: Integer
       , desiredAsset :: (CurrencySymbol,TokenName)
       , strikePrice :: Rational
       , creatorAddress :: Address
       , premiumAsset :: (CurrencySymbol,TokenName)
-      , premium :: Integer -- ^ Always in ADA
+      , premium :: Integer
       , expiration :: POSIXTime -- ^ Slot where the contract will expire.
       }
   | ActiveContract
-      { beaconSymbol :: CurrencySymbol -- ^ PolicyId for the options beacon policy.
+      { beaconSymbol :: CurrencySymbol -- ^ PolicyId for the relevant options beacon policy.
       , currentAsset :: (CurrencySymbol,TokenName)
       , currentAssetQuantity :: Integer
       , desiredAsset :: (CurrencySymbol,TokenName)
@@ -117,8 +119,8 @@ data OptionsDatum
 
 instance Eq OptionsDatum where
   {-# INLINABLE (==) #-}
-  (AssetsForContract a b c) == (AssetsForContract a' b' c') = 
-    a == a' && b == b' && c == c'
+  (AssetsForContract a b c d) == (AssetsForContract a' b' c' d') = 
+    a == a' && b == b' && c == c' && d == d'
   (ProposedContract a b c d e f g h i) == (ProposedContract a' b' c' d' e' f' g' h' i') =
     a == a' && b == b' && c == c' && d == d' && e == e' && f == f' && g == g' && h == h' && i == i'
   (ActiveContract a b c d e f g h i j) == (ActiveContract a' b' c' d' e' f' g' h' i' j') =
@@ -204,8 +206,7 @@ signed (k:ks) k'
   | k == k' = True
   | otherwise = signed ks k'
 
--- | This is only used by the validator to prevent permanent locking when a staking script
--- is accidentally used. The beacons require that the address uses a staking pubkey.
+-- | This function is used to overload the staking credential for owner authorizations.
 {-# INLINABLE stakingCredApproves #-}
 stakingCredApproves :: Address -> TxInfo -> Bool
 stakingCredApproves addr info = case addressStakingCredential addr of
@@ -222,7 +223,8 @@ stakingCredApproves addr info = case addressStakingCredential addr of
 
 -- | This function does the input validation for MintActiveBeacon of the beacon policy.
 -- It will either fail with an appropriate error or return what the output datum should
--- be based on the two inputs.
+-- be based on the two inputs. As long as the datums agree, all of the info for the new
+-- datum can come from the ProposedContract datum.
 {-# INLINABLE acceptContractInputCheck #-}
 acceptContractInputCheck :: CurrencySymbol -> TokenName -> ValidatorHash 
                          -> Credential -> TxInfo -> OptionsDatum
@@ -297,21 +299,22 @@ acceptContractInputCheck beaconSym contractId valHash stakingCred info =
           traceError "Datums do not agree on currentAsset"
       | currentAssetQuantity assetsDatum /= currentAssetQuantity proposedDatum =
           traceError "Datums do not agree on currentAssetQuantity"
+      | desiredAsset assetsDatum /= desiredAsset proposedDatum =
+          traceError "Datums do not agree on desiredAsset"
       | otherwise = True
 
 -------------------------------------------------
 -- On-Chain Options Validator
 -------------------------------------------------
--- | This validator guarantees trustless contract negotiations and executions. Each user
+-- | This validator guarantees trustless contract creation and executions. Each user
 -- gets there own address instance for this validator script. Due to this, custody and
 -- delegation control is maintained by every user. This validator script overloads the
 -- staking credential so that it can be used to authorize owner related actions.
 --
 -- This validator follows the American rules for options contracts where the contract can 
 -- be executed at any time before the expiration.
-mkOptionsValidator :: OptionsConfig -- ^ Extra Parameter
-                   -> OptionsDatum -> OptionsRedeemer -> ScriptContext -> Bool
-mkOptionsValidator OptionsConfig{..} optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = 
+mkOptionsValidator :: OptionsDatum -> OptionsRedeemer -> ScriptContext -> Bool
+mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} = 
   case r of
     CloseAssets ->
       -- | The UTxO must have an AssetsForContract datum.
@@ -348,7 +351,7 @@ mkOptionsValidator OptionsConfig{..} optionsDatum r ctx@ScriptContext{scriptCont
     AcceptContract ->
       -- | Check that an Active token is minted. This guarantees that the minting policy is
       -- executed this tx. The minting policy does all the required checks.
-      traceIfFalse "Active beacon not minted" $
+      traceIfFalse "Exactly one Active beacon not minted" $
         valueOf (txInfoMint info) (beaconSymbol optionsDatum) (TokenName "Active") == 1
     ExecuteContract contractId' ->
       -- | The UTxO must have an Active beacon. This also implies that the UTxO has
@@ -372,10 +375,10 @@ mkOptionsValidator OptionsConfig{..} optionsDatum r ctx@ScriptContext{scriptCont
         ) &&
       -- | The following value must be paid to the creator's address:
       --     1) 5 ADA 
-      --       <> (uncurry singleton desiredAssetConfig) (ceiling $ currentAssetQuantity * strikePrice)
+      --       <> (uncurry singleton desiredAsset) (ceiling $ currentAssetQuantity * strikePrice)
       --       <> 1 ContractID
       -- The 5 ADA was the creator's deposit from the AssetsForContract UTxO.
-      traceIfFalse "Creator not properly paid desired asset" (creatorPaid contractId')
+      traceIfFalse "Creator not properly paid" (creatorPaid contractId')
     CloseExpiredContract ->
       -- | The UTxO must have an ActiveContract datum.
       traceIfFalse "Datum is not an ActiveContract datum" (encodeDatum optionsDatum == 2) &&
@@ -459,7 +462,7 @@ mkOptionsValidator OptionsConfig{..} optionsDatum r ctx@ScriptContext{scriptCont
       let outputs = txInfoOutputs info
           due = ceiling $ fromInteger (currentAssetQuantity optionsDatum) * strikePrice optionsDatum
           creatorAddr = creatorAddress optionsDatum
-          desired = desiredAssetConfig
+          desired = desiredAsset optionsDatum
           receiptToken = (beaconSymbol optionsDatum,contractId')
           foo targetAddr targetAsset due' receiptToken' acc TxOut{txOutValue = oVal
                                                                  ,txOutAddress = addr
@@ -483,32 +486,35 @@ instance ValidatorTypes Options where
   type instance RedeemerType Options = OptionsRedeemer
   type instance DatumType Options = OptionsDatum
 
-optionsValidator :: OptionsConfig -> Validator
-optionsValidator config = Plutonomy.optimizeUPLC $ validatorScript $ mkTypedValidator @Options
-    ($$(PlutusTx.compile [|| mkOptionsValidator ||])
-      `PlutusTx.applyCode` PlutusTx.liftCode config)
+optionsValidator :: Validator
+optionsValidator = Plutonomy.optimizeUPLC $ validatorScript $ mkTypedValidator @Options
+    $$(PlutusTx.compile [|| mkOptionsValidator ||])
     $$(PlutusTx.compile [|| wrap ||])
   where wrap = mkUntypedValidator
 
-optionsValidatorScript :: OptionsConfig -> Script
-optionsValidatorScript = unValidatorScript . optionsValidator
+optionsValidatorScript :: Script
+optionsValidatorScript = unValidatorScript optionsValidator
 
-optionsValidatorHash :: OptionsConfig -> ValidatorHash
-optionsValidatorHash = Scripts.validatorHash . optionsValidator
+optionsValidatorHash :: ValidatorHash
+optionsValidatorHash = Scripts.validatorHash optionsValidator
 
 -------------------------------------------------
 -- On-Chain Options Beacon Policy
 -------------------------------------------------
--- | This minting policy tags each step of the process with a easily queryable token. 
+-- | This minting policy tags each step of the process with an easily queryable token. 
 -- When a contract is accepted, two beacons with the token name of the ContractID are 
 -- minted: one stays in the options validator address with the assets that can be swapped
 -- upon execution, and the other goes to the user who accepted the contract. This user 
 -- controlled copy can be freely traded. To actually execute the contract, both copies
--- of this ContractID tokne must be burned. In this way, the user controlled copy acts 
--- as a key to the contract.
-mkOptionsBeaconPolicy :: AppName -> ValidatorHash -- ^ Extra parameters
+-- of this ContractID token must be included in the tx inputs. In this way, the user
+-- controlled copy acts as a key to the contract.
+--
+-- A unique policy is created for every contract pair. This makes querying the contracts
+-- as efficient as possible.
+mkOptionsBeaconPolicy :: OptionsConfig -> AppName -> ValidatorHash -- ^ Extra parameters
                       -> OptionsBeaconRedeemer -> ScriptContext -> Bool
-mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = info} = case r of
+mkOptionsBeaconPolicy OptionsConfig{..} appName valHash r ctx@ScriptContext{scriptContextTxInfo = info} = 
+  case r of
     MintAssetsBeacon -> 
       -- | The following function checks:
       -- 1) Must only mint one token with the token name "Assets".
@@ -520,12 +526,14 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
       -- 3) The receiving address must signal approval.
       -- 4) The Assets beacon must be stored in a UTxO with the proper inline datum:
       --     a) The currency symbol must be this policy id.
-      --     b) The currentAssetQuantity > 0
+      --     b) The currentAsset == currentAssetConfig
+      --     c) The currentAssetQuantity > 0
+      --     d) The desiredAsset == desiredAssetConfig
       -- 5) The Assets beacon must be stored with the proper value:
-      --     a) 5 ADA <> target of current asset <> Asset beacon
+      --     a) 5 ADA <> currentAsset amount <> Asset beacon
       -- 5 ADA is used as the min deposit because a hard coded minUTxO value is easier to protect
       -- than a variable one. By setting it to 5 ADA, most UTxO sizes should be possible while still
-      -- allowing the script to easily protect the writer's deposit.
+      -- allowing the script to easily protect the contract creator's deposit.
       traceIfFalse "Receiving staking credential did not approve" assetsOrProposedDestinationCheck
     MintProposedBeacons ->
       -- | The following function checks:
@@ -538,14 +546,16 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
       -- 3) The receiving address must signal approval.
       -- 3) The Proposed beacons must be stored with the proper inline ProposedContract datum:
       --     a) beaconSymbol == this policy id
-      --     b) currentAssetQuantity > 0
-      --     c) strikePrice > 0
-      --     d) premium > 0
-      --     e) expiration > 0
+      --     b) currentAsset == currentAssetConfig
+      --     c) currentAssetQuantity > 0
+      --     d) desiredAsset == desiredAssetConfig
+      --     e) strikePrice > 0
+      --     f) premium > 0
+      --     g) expiration > 0
       -- 4) Each Proposed beacon must be stored with the value:
       --     a) 3 ADA <> 1 Proposed beacon
-      -- Hard coding the minUTxO value to 3 makes it easier to ensure the writer's deposit is returned
-      -- when the contract is accepted.
+      -- Hard coding the minUTxO value to 3 makes it easier to ensure the contract creator's 
+      -- deposit is returned when the contract is accepted.
       traceIfFalse "Receiving staking credential did not approve" assetsOrProposedDestinationCheck
     MintActiveBeacon contractId stakingCred ->
       -- ============================
@@ -563,21 +573,24 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
       -- | Only one dApp address has inputs in this tx. Addresses are not meant to compose. The
       -- redeemer stakingCred specifies what dApp address this transaction is for.
       -- | There must be exactly two inputs from this address:
-      --     1) One input must be an AssetsForContract UTxO with an Assets beacon.
-      --     2) One input must be a ProposedContract UTxO with a Proposed beacon.
+      --     1) One input must be an AssetsForContract UTxO with the proper Assets beacon.
+      --     2) One input must be a ProposedContract UTxO with the proper Proposed beacon.
       --     3) The AssetsForContract UTxO input must have the tx hash supplied by the
       --        MintActiveBeacon redeemer.
       -- | The datums of the two inputs must agree:
       --     1) same beaconSymbol
       --     2) same currentAsset
       --     3) same currentAssetQuantity
+      -- Note: Accepting multiple contracts in a single tx is not supported. This dramatically
+      -- simplifies the code.
 
       -- ======================
       -- | Output Verification:
       -- ======================
       -- | The premium must be paid to the creator's address + 3 ADA. The 3 ADA was the creator's
       -- deposit for the ProposedContract UTxO.
-      -- | There must be only one output to target address with the following properties:
+      -- | There must be only one output to the target options address with the following
+      -- properties:
       --     1) Must have the proper value:
       --          5 ADA <> quantity of current asset <> Active beacon <> 1 ContractID
       --     2) The datum must be an ActiveContract inline datum with:
@@ -591,6 +604,8 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
       --           h) premium == premium of Proposed input
       --           i) expiration == expiration of Proposed input
       --           j) contractId == tx hash supplied by AcceptContract redeemer
+      -- Note: Since the input datums must agree, it is safe to take all the info from the
+      -- ProposedContract datum.
       activeDestinationCheck stakingCred
         (acceptContractInputCheck beaconSym contractId valHash stakingCred info)
     BurnBeacons ->
@@ -651,12 +666,16 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
     validDatum :: OptionsBeaconRedeemer -> OptionsDatum -> Bool
     validDatum MintAssetsBeacon AssetsForContract{..}
       | beaconSymbol /= beaconSym = traceError "Invalid AssetsForContract beaconSymbol"
+      | currentAsset /= currentAssetConfig = traceError "Invalid AssetsForContract currentAsset"
       | currentAssetQuantity <= 0 = traceError "Invalid AssetsForContract currentAssetQuantity"
+      | desiredAsset /= desiredAssetConfig = traceError "Invalid AssetsForContract desiredAsset"
       | otherwise = True
     validDatum MintAssetsBeacon _ = traceError "Assets beacon stored with wrong datum type"
     validDatum MintProposedBeacons ProposedContract{..}
       | beaconSymbol /= beaconSym = traceError "Invalid ProposedContract beaconSymbol"
+      | currentAsset /= currentAssetConfig = traceError "Invalid ProposedContract currentAsset"
       | currentAssetQuantity <= 0 = traceError "Invalid ProposedContract currentAssetQuantity"
+      | desiredAsset /= desiredAssetConfig = traceError "Invalid ProposedContract desiredAsset"
       | strikePrice <= fromInteger 0 = traceError "Invalid ProposedContract strikePrice"
       | premium <= 0 = traceError "Invalid ProposedContract premium"
       | expiration <= 0 = traceError "Invalid ProposedContract expiration"
@@ -766,11 +785,11 @@ mkOptionsBeaconPolicy appName valHash r ctx@ScriptContext{scriptContextTxInfo = 
 optionsBeaconPolicy :: OptionsConfig -> MintingPolicy
 optionsBeaconPolicy config = Plutonomy.optimizeUPLC $ mkMintingPolicyScript
   ($$(PlutusTx.compile [|| wrap ||])
+    `PlutusTx.applyCode` PlutusTx.liftCode config
     `PlutusTx.applyCode` PlutusTx.liftCode app
-    `PlutusTx.applyCode` PlutusTx.liftCode valHash)
+    `PlutusTx.applyCode` PlutusTx.liftCode optionsValidatorHash)
   where
-    wrap x y = mkUntypedMintingPolicy $ mkOptionsBeaconPolicy x y
-    valHash = optionsValidatorHash config
+    wrap x y z = mkUntypedMintingPolicy $ mkOptionsBeaconPolicy x y z
 
 optionsBeaconPolicyScript :: OptionsConfig -> Script
 optionsBeaconPolicyScript = unMintingPolicyScript . optionsBeaconPolicy

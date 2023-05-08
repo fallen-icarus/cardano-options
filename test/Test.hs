@@ -8,6 +8,7 @@ import Test.CloseAssetsUTxO as CloseAssetsUTxO
 import Test.CloseProposalUTxO as CloseProposalUTxO
 import Test.AcceptContract as AcceptContract
 import Test.ExecuteContract as ExecuteContract
+import Test.CloseExpiredContract as CloseExpiredContract
 
 main :: IO ()
 main = defaultMain $ testGroup "Cardano-Options"
@@ -18,4 +19,5 @@ main = defaultMain $ testGroup "Cardano-Options"
   , CloseProposalUTxO.tests
   , AcceptContract.tests
   , ExecuteContract.tests
+  , CloseExpiredContract.tests
   ]

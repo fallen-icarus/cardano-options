@@ -45,9 +45,10 @@ successfullyCloseSingleAssetsUTxO = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -60,12 +61,12 @@ successfullyCloseSingleAssetsUTxO = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -76,28 +77,29 @@ successfullyCloseSingleAssetsUTxO = do
 
   callEndpoint @"close-assets-utxo(s)" h1 $
     CloseAssetsParams
-      { closeAssetsBeaconsBurned = [("Assets",-1)]
+      { closeAssetsBeaconsBurned = [[("Assets",-1)]]
       , closeAssetsBeaconRedeemer = BurnBeacons
-      , closeAssetsBeaconPolicy = optionsBeaconPolicy
+      , closeAssetsBeaconPolicies = [optionsBeaconPolicy1]
       , closeAssetsOptionsVal = optionsValidator
       , closeAssetsOptionsAddress = addr
       , closeAssetsSpecificUTxOs = 
           [ ( assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
       }
 
-successfullyCloseMultipleAssetsUTxO :: EmulatorTrace ()
-successfullyCloseMultipleAssetsUTxO = do
+successfullyCloseMultipleSameAssetsUTxO :: EmulatorTrace ()
+successfullyCloseMultipleSameAssetsUTxO = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -110,12 +112,12 @@ successfullyCloseMultipleAssetsUTxO = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -128,12 +130,12 @@ successfullyCloseMultipleAssetsUTxO = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum{currentAssetQuantity = 50_000_000}
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -144,21 +146,101 @@ successfullyCloseMultipleAssetsUTxO = do
 
   callEndpoint @"close-assets-utxo(s)" h1 $
     CloseAssetsParams
-      { closeAssetsBeaconsBurned = [("Assets",-2)]
+      { closeAssetsBeaconsBurned = [[("Assets",-2)]]
       , closeAssetsBeaconRedeemer = BurnBeacons
-      , closeAssetsBeaconPolicy = optionsBeaconPolicy
+      , closeAssetsBeaconPolicies = [optionsBeaconPolicy1]
       , closeAssetsOptionsVal = optionsValidator
       , closeAssetsOptionsAddress = addr
       , closeAssetsSpecificUTxOs = 
           [ ( assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           , ( assetsDatum{currentAssetQuantity = 50_000_000}
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
+            )
+          ]
+      }
+
+successfullyCloseMultipleDifferentAssetsUTxO :: EmulatorTrace ()
+successfullyCloseMultipleDifferentAssetsUTxO = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let assetsDatum = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy1
+      , assetsAddress = addr
+      , assetsInfo = 
+          [ ( Just assetsDatum
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 2
+
+  let assetsDatum2 = AssetsForContract
+        { beaconSymbol = optionsBeaconPolicySym4
+        , currentAsset = testToken1
+        , currentAssetQuantity = 10
+        , desiredAsset = testToken2
+        }
+  callEndpoint @"create-assets-utxo" h1 $
+    AssetsParams
+      { assetsBeaconsMinted = [("Assets",1)]
+      , assetsBeaconRedeemer = MintAssetsBeacon
+      , assetsBeaconPolicy = optionsBeaconPolicy4
+      , assetsAddress = addr
+      , assetsInfo = 
+          [ ( Just assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym4 "Assets" 1
+           <> (uncurry singleton testToken1) 10
+            )
+          ]
+      , assetsAsInline = True
+      }
+
+  void $ waitUntilSlot 4
+
+  callEndpoint @"close-assets-utxo(s)" h1 $
+    CloseAssetsParams
+      { closeAssetsBeaconsBurned = [[("Assets",-1)],[("Assets",-1)]]
+      , closeAssetsBeaconRedeemer = BurnBeacons
+      , closeAssetsBeaconPolicies = [optionsBeaconPolicy1,optionsBeaconPolicy4]
+      , closeAssetsOptionsVal = optionsValidator
+      , closeAssetsOptionsAddress = addr
+      , closeAssetsSpecificUTxOs = 
+          [ ( assetsDatum
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
+           <> lovelaceValueOf 100_000_000
+            )
+          , ( assetsDatum2
+            , lovelaceValueOf 5_000_000 
+           <> singleton optionsBeaconPolicySym4 "Assets" 1
+           <> (uncurry singleton testToken1) 10
             )
           ]
       }
@@ -168,7 +250,7 @@ utxoDatumNotAssetsForContract = do
   h1 <- activateContractWallet (knownWallet 2) endpoints
 
   let proposeDatum = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
@@ -189,12 +271,12 @@ utxoDatumNotAssetsForContract = do
     ProposeParams
       { proposeBeaconsMinted = [("Proposed",1)]
       , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy
+      , proposeBeaconPolicy = optionsBeaconPolicy1
       , proposeAddress = addr
       , proposeInfo = 
           [ ( Just proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       , proposeAsInline = True
@@ -204,15 +286,15 @@ utxoDatumNotAssetsForContract = do
 
   callEndpoint @"close-assets-utxo(s)" h1 $
     CloseAssetsParams
-      { closeAssetsBeaconsBurned = [("Assets",-1)]
+      { closeAssetsBeaconsBurned = [[("Assets",-1)]]
       , closeAssetsBeaconRedeemer = BurnBeacons
-      , closeAssetsBeaconPolicy = optionsBeaconPolicy
+      , closeAssetsBeaconPolicies = [optionsBeaconPolicy1]
       , closeAssetsOptionsVal = optionsValidator
       , closeAssetsOptionsAddress = addr
       , closeAssetsSpecificUTxOs = 
           [ ( proposeDatum
             , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySymbol "Proposed" 1
+           <> singleton optionsBeaconPolicySym1 "Proposed" 1
            )
           ]
       }
@@ -222,9 +304,10 @@ singleAssetsBeaconNotBurned = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -237,12 +320,12 @@ singleAssetsBeaconNotBurned = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -255,13 +338,13 @@ singleAssetsBeaconNotBurned = do
     CloseAssetsParams
       { closeAssetsBeaconsBurned = []
       , closeAssetsBeaconRedeemer = BurnBeacons
-      , closeAssetsBeaconPolicy = optionsBeaconPolicy
+      , closeAssetsBeaconPolicies = [optionsBeaconPolicy1]
       , closeAssetsOptionsVal = optionsValidator
       , closeAssetsOptionsAddress = addr
       , closeAssetsSpecificUTxOs = 
           [ ( assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -272,9 +355,10 @@ atLeastOneAssetsBeaconNotBurned = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -287,12 +371,12 @@ atLeastOneAssetsBeaconNotBurned = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -305,12 +389,12 @@ atLeastOneAssetsBeaconNotBurned = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum{currentAssetQuantity = 50_000_000}
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -321,20 +405,20 @@ atLeastOneAssetsBeaconNotBurned = do
 
   callEndpoint @"close-assets-utxo(s)" h1 $
     CloseAssetsParams
-      { closeAssetsBeaconsBurned = [("Assets",-1)]
+      { closeAssetsBeaconsBurned = [[("Assets",-1)]]
       , closeAssetsBeaconRedeemer = BurnBeacons
-      , closeAssetsBeaconPolicy = optionsBeaconPolicy
+      , closeAssetsBeaconPolicies = [optionsBeaconPolicy1]
       , closeAssetsOptionsVal = optionsValidator
       , closeAssetsOptionsAddress = addr
       , closeAssetsSpecificUTxOs = 
           [ ( assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           , ( assetsDatum{currentAssetQuantity = 50_000_000}
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 50_000_000
             )
           ]
@@ -345,9 +429,10 @@ activeBeaconMinted = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -360,12 +445,12 @@ activeBeaconMinted = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -376,15 +461,15 @@ activeBeaconMinted = do
 
   callEndpoint @"close-assets-utxo(s)" h1 $
     CloseAssetsParams
-      { closeAssetsBeaconsBurned = [("Assets",-1),("Active",1)]
+      { closeAssetsBeaconsBurned = [[("Assets",-1),("Active",1)]]
       , closeAssetsBeaconRedeemer = BurnBeacons
-      , closeAssetsBeaconPolicy = optionsBeaconPolicy
+      , closeAssetsBeaconPolicies = [optionsBeaconPolicy1]
       , closeAssetsOptionsVal = optionsValidator
       , closeAssetsOptionsAddress = addr
       , closeAssetsSpecificUTxOs = 
           [ ( assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -396,9 +481,10 @@ stakingCredDidNotApprove = do
   h2 <- activateContractWallet (knownWallet 4) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -411,12 +497,12 @@ stakingCredDidNotApprove = do
     AssetsParams
       { assetsBeaconsMinted = [("Assets",1)]
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -427,15 +513,15 @@ stakingCredDidNotApprove = do
 
   callEndpoint @"close-assets-utxo(s)" h2 $
     CloseAssetsParams
-      { closeAssetsBeaconsBurned = [("Assets",-1)]
+      { closeAssetsBeaconsBurned = [[("Assets",-1)]]
       , closeAssetsBeaconRedeemer = BurnBeacons
-      , closeAssetsBeaconPolicy = optionsBeaconPolicy
+      , closeAssetsBeaconPolicies = [optionsBeaconPolicy1]
       , closeAssetsOptionsVal = optionsValidator
       , closeAssetsOptionsAddress = addr
       , closeAssetsSpecificUTxOs = 
           [ ( assetsDatum
             , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySymbol "Assets" 1
+           <> singleton optionsBeaconPolicySym1 "Assets" 1
            <> lovelaceValueOf 100_000_000
             )
           ]
@@ -446,9 +532,10 @@ successfullyCloseInvalidAssetsUTxO = do
   h1 <- activateContractWallet (knownWallet 1) endpoints
 
   let assetsDatum = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySymbol
+        { beaconSymbol = optionsBeaconPolicySym1
         , currentAsset = (adaSymbol,adaToken)
         , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
         }
       addr = Address (ScriptCredential optionsValidatorHash)
                      (Just $ StakingHash
@@ -461,7 +548,7 @@ successfullyCloseInvalidAssetsUTxO = do
     AssetsParams
       { assetsBeaconsMinted = []
       , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy
+      , assetsBeaconPolicy = optionsBeaconPolicy1
       , assetsAddress = addr
       , assetsInfo = 
           [ ( Just assetsDatum
@@ -478,7 +565,7 @@ successfullyCloseInvalidAssetsUTxO = do
     CloseAssetsParams
       { closeAssetsBeaconsBurned = []
       , closeAssetsBeaconRedeemer = BurnBeacons
-      , closeAssetsBeaconPolicy = optionsBeaconPolicy
+      , closeAssetsBeaconPolicies = [optionsBeaconPolicy1]
       , closeAssetsOptionsVal = optionsValidator
       , closeAssetsOptionsAddress = addr
       , closeAssetsSpecificUTxOs = 
@@ -495,8 +582,10 @@ successfullyCloseInvalidAssetsUTxO = do
 tests :: TestTree
 tests = do
   let opts = defaultCheckOptions & emulatorConfig .~ emConfig
+      lenientOpts = defaultCheckOptions & emulatorConfig .~ lenientConfig
   testGroup "Close Assets UTxO(s)"
-    [ checkPredicateOptions opts "Fail if the datum is not an AssetsForContract datum"
+    [ 
+      checkPredicateOptions opts "Fail if the datum is not an AssetsForContract datum"
         (Test.not assertNoFailedTransactions) utxoDatumNotAssetsForContract
     , checkPredicateOptions opts "Fail if only Assets beacon is not burned"
         (Test.not assertNoFailedTransactions) singleAssetsBeaconNotBurned
@@ -509,8 +598,10 @@ tests = do
 
     , checkPredicateOptions opts "Successfully close a single Assets UTxO"
         assertNoFailedTransactions successfullyCloseSingleAssetsUTxO
-    , checkPredicateOptions opts "Successfully close multiple Assets UTxOs"
-        assertNoFailedTransactions successfullyCloseMultipleAssetsUTxO
+    , checkPredicateOptions opts "Successfully close multiple same Assets UTxOs"
+        assertNoFailedTransactions successfullyCloseMultipleSameAssetsUTxO
+    , checkPredicateOptions lenientOpts "Successfully close multiple different Assets UTxOs"
+        assertNoFailedTransactions successfullyCloseMultipleDifferentAssetsUTxO
     , checkPredicateOptions opts "Successfully close invalid Assets UTxO"
         assertNoFailedTransactions successfullyCloseInvalidAssetsUTxO
     ]

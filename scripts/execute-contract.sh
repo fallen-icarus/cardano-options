@@ -16,6 +16,11 @@ activeTokenName="416374697665" # This is the hexidecimal encoding for 'Active'
 
 contractId="3c4d40a176b599ecb82d45a80795bb8219e1dcd4d84e0dde64f46ff872f7d52f"
 
+## Export the options validator script.
+echo "Exporting the options validator script..."
+cardano-options export-script options-script \
+  --out-file $optionsScriptFile
+
 ## Export the beacon policy for that trading pair.
 echo "Exporting the beacon policy script..."
 cardano-options export-script beacon-policy \

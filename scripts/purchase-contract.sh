@@ -26,6 +26,11 @@ optionsAddrStakingCred="3cefec09a27b6894e2ed9a78b9cc01f083973d7c0afb8cec8bda33fa
 
 contractId="3c4d40a176b599ecb82d45a80795bb8219e1dcd4d84e0dde64f46ff872f7d52f"
 
+## Export the options validator script.
+echo "Exporting the options validator script..."
+cardano-options export-script options-script \
+  --out-file $optionsScriptFile
+
 ## Export the beacon policy for that trading pair.
 echo "Exporting the beacon policy script..."
 cardano-options export-script beacon-policy \

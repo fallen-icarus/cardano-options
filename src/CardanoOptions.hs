@@ -44,6 +44,7 @@ module CardanoOptions
   posixTimeToSlot,
   getPubKeyHash,
   getValidatorHash,
+  unsafeFromRight,
 
   optionsValidator,
   optionsValidatorScript,

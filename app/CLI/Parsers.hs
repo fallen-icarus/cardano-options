@@ -6,6 +6,7 @@ module CLI.Parsers
 ) where
 
 import Options.Applicative
+import Data.Text (Text,pack)
 
 import CardanoOptions
 import CLI.Types
@@ -19,6 +20,16 @@ parseCommand = hsubparser $ mconcat
       (info parseExportScript $ progDesc "Export a dApp plutus script.")
   , command "options-datum"
       (info parseCreateOptionsDatum $ progDesc "Create a datum for the options validator.")
+  , command "options-redeemer"
+      (info pCreateOptionsRedeemer $ progDesc "Create a redeemer for the options validator.")
+  , command "beacon-redeemer"
+      (info parseCreateBeaconRedeemer $ progDesc "Create a redeemer for the beacon policy.")
+  , command "address-hashes"
+      (info pExtractAddressInfo $ progDesc "Extract hashes from a bech32 address.")
+  , command "generate-bech32-address"
+      (info pGenerateBech32Address $ progDesc "Generate a bech32 address from hashes.")
+  , command "convert"
+      (info pConvert $ progDesc "Convert POSIXTime <--> Slot.")
   ]
 
 -------------------------------------------------
@@ -62,7 +73,129 @@ parseCreateOptionsDatum = hsubparser $ mconcat
 
     pAccept :: Parser Command
     pAccept = CreateOptionsDatum <$> pActiveContract <*> pOutputFile
+
+-------------------------------------------------
+-- CreateOptionsRedeemer Parsers
+-------------------------------------------------
+pCreateOptionsRedeemer :: Parser Command
+pCreateOptionsRedeemer =
+    CreateOptionsRedeemer
+      <$> (pCloseAssets <|> pCloseProposed <|> pAcceptContract <|> pExecuteContract <|> pCloseExpired)
+      <*> pOutputFile
+  where
+    pCloseAssets :: Parser OptionsRedeemer
+    pCloseAssets = flag' CloseAssets
+      (  long "close-assets"
+      <> help "Close an Assets UTxO."
+      )
+
+    pCloseProposed :: Parser OptionsRedeemer
+    pCloseProposed = flag' CloseProposedContracts
+      (  long "close-proposal"
+      <> help "Close a Proposal UTxO."
+      )
+
+    pAcceptContract :: Parser OptionsRedeemer
+    pAcceptContract = flag' AcceptContract
+      (  long "purchase-contract"
+      <> help "Purchase an options contract."
+      )
+
+    pExecuteContract :: Parser OptionsRedeemer
+    pExecuteContract = flag' ExecuteContract
+      (  long "execute-contract"
+      <> help "Execute an options contract."
+      )
+
+    pCloseExpired :: Parser OptionsRedeemer
+    pCloseExpired = flag' CloseExpiredContract
+      (  long "close-expired-contract"
+      <> help "Close an expired contract UTxO."
+      )
+
+-------------------------------------------------
+-- CreateBeaconRedeemer Parser
+-------------------------------------------------
+parseCreateBeaconRedeemer :: Parser Command
+parseCreateBeaconRedeemer = hsubparser $ mconcat
+    [ command "mint-assets"
+        (info pMintAssets $ progDesc "Create the redeemer for minting an Assets beacon.")
+    , command "mint-proposal"
+        (info pMintProposed $ progDesc "Create the redeemer for minting Proposed beacons.")
+    , command "mint-active"
+        (info pMintActive $ progDesc "Create the redeemer for minting an Active beacon and ContractID.")
+    , command "burn-beacons"
+        (info pBurnBeacons $ progDesc "Create the redeemer for burning beacons.")
+    ]
+  where
+    pMintAssets :: Parser Command
+    pMintAssets = CreateBeaconRedeemer MintAssetsBeacon <$> pOutputFile
+
+    pMintProposed :: Parser Command
+    pMintProposed = 
+      CreateBeaconRedeemer MintProposedBeacons <$> pOutputFile
+
+    pMintActive :: Parser Command
+    pMintActive = 
+      CreateBeaconRedeemer 
+        <$> (MintActiveBeacon <$> pContractId <*> pCredential)
+        <*> pOutputFile
     
+    pBurnBeacons :: Parser Command
+    pBurnBeacons = CreateBeaconRedeemer BurnBeacons <$> pOutputFile
+
+    pScriptCredential :: Parser Credential
+    pScriptCredential = ScriptCredential <$> option (eitherReader readValidatorHash)
+      (  long "staking-script-hash"
+      <> metavar "STRING"
+      <> help "The hash of the staking script used in the options' address."
+      )
+
+    pPubKeyCredential :: Parser Credential
+    pPubKeyCredential = PubKeyCredential <$> option (eitherReader readPubKeyHash)
+      ( long "staking-pubkey-hash"
+      <> metavar "STRING"
+      <> help "The hash of the staking pubkey used in the options' address."
+      )
+
+    pCredential :: Parser Credential
+    pCredential = pPubKeyCredential <|> pScriptCredential
+
+-------------------------------------------------
+-- ExtractAddressHashes Parser
+-------------------------------------------------
+pExtractAddressInfo :: Parser Command
+pExtractAddressInfo = ExtractAddressHashes <$> pBechAddr <*> pOutput
+  where
+    pBechAddr :: Parser Text
+    pBechAddr = pack <$> pBech32Address
+
+-------------------------------------------------
+-- GenerateBech32Address Parser
+-------------------------------------------------
+pGenerateBech32Address :: Parser Command
+pGenerateBech32Address = GenerateBech32Address <$> pAddress <*> pOutput
+
+-------------------------------------------------
+-- Convert Parser
+-------------------------------------------------
+pConvert :: Parser Command
+pConvert = Convert <$> (pPOSIXTime <|> pSlot)
+  where
+    pPOSIXTime :: Parser Convert
+    pPOSIXTime = POSIXTimeToSlot . POSIXTime <$> option auto
+      (  long "posix-time"
+      <> metavar "INT"
+      <> help "Convert POSIX time to slot number."
+      )
+
+    pSlot :: Parser Convert
+    pSlot = SlotToPOSIXTime . Slot <$> option auto
+      (  long "slot"
+      <> metavar "INT"
+      <> help "Convert slot number to POSIX time."
+      )
+
 -------------------------------------------------
 -- Basic Helper Parsers
 -------------------------------------------------
@@ -181,6 +314,9 @@ pAddress =
       <> help "The hash of the payment pubkey used in the address."
       )
 
+    pPaymentCredential :: Parser Credential
+    pPaymentCredential = pPaymentPubKeyCredential <|> pPaymentScriptCredential
+
     pStakingScriptCredential :: Parser StakingCredential
     pStakingScriptCredential = StakingHash . ScriptCredential <$> option (eitherReader readValidatorHash)
       (  long "staking-script-hash"
@@ -194,9 +330,6 @@ pAddress =
       <> metavar "STRING"
       <> help "The hash of the staking pubkey used in the address."
       )
-
-    pPaymentCredential :: Parser Credential
-    pPaymentCredential = pPaymentPubKeyCredential <|> pPaymentScriptCredential
 
     pStakingCredential :: Parser (Maybe StakingCredential)
     pStakingCredential = Just <$> (pStakingPubKeyCredential <|> pStakingScriptCredential)
@@ -271,3 +404,19 @@ pActiveContract =
     <*> pPremium
     <*> pExpiration
     <*> pContractId
+
+pBech32Address :: Parser String
+pBech32Address = strOption
+  (  long "address"
+  <> metavar "STRING"
+  <> help "Address in bech32 format."
+  )
+
+pOutput :: Parser Output
+pOutput = pStdOut <|> File <$> pOutputFile
+  where
+    pStdOut :: Parser Output
+    pStdOut = flag' Stdout
+      (  long "stdout"
+      <> help "Display to stdout."
+      )

@@ -25,11 +25,25 @@ module CardanoOptions
   CurrencySymbol(..),
   TokenName(..),
   Credential(..),
+  StakingCredential(..),
   POSIXTime(..),
   Slot(..),
+  PubKeyHash(),
+  PlutusRational,
+  ValidatorHash(..),
+  Address(..),
   txIdAsToken,
   adaSymbol,
   adaToken,
+  unsafeRatio,
+  readPubKeyHash,
+  readValidatorHash,
+  readCurrencySymbol,
+  readTokenName,
+  slotToPOSIXTime,
+  posixTimeToSlot,
+  getPubKeyHash,
+  getValidatorHash,
 
   optionsValidator,
   optionsValidatorScript,
@@ -38,6 +52,10 @@ module CardanoOptions
   optionsBeaconPolicy,
   optionsBeaconPolicyScript,
   optionsBeaconPolicySymbol,
+
+  writeData,
+  writeScript,
+  decodeDatum
 ) where
 
 import Data.Aeson hiding (Value,Options)
@@ -45,6 +63,7 @@ import qualified Data.Aeson as Aeson
 import Codec.Serialise (serialise)
 import qualified Data.ByteString.Lazy  as LBS
 import qualified Data.ByteString.Short as SBS
+import qualified Data.ByteString as B
 import Prelude (IO,FilePath,seq) 
 import qualified Prelude as Haskell
 import Data.String (fromString)
@@ -55,7 +74,8 @@ import Cardano.Api hiding (Script,Value,TxOut,Address,ScriptHash,TxId)
 import Cardano.Api.Shelley (PlutusScript (..))
 import Ledger.Tx.CardanoAPI.Internal
 import Plutus.V2.Ledger.Contexts
-import Plutus.V2.Ledger.Api
+import Plutus.V2.Ledger.Api hiding (getPubKeyHash)
+import qualified Plutus.V2.Ledger.Api as Api
 import qualified PlutusTx
 import PlutusTx.Prelude
 import Ledger.Address
@@ -796,3 +816,90 @@ optionsBeaconPolicyScript = unMintingPolicyScript . optionsBeaconPolicy
 
 optionsBeaconPolicySymbol :: OptionsConfig -> CurrencySymbol
 optionsBeaconPolicySymbol = scriptCurrencySymbol . optionsBeaconPolicy
+
+-------------------------------------------------
+-- Serialization
+-------------------------------------------------
+dataToScriptData :: Data -> ScriptData
+dataToScriptData (Constr n xs) = ScriptDataConstructor n $ dataToScriptData <$> xs
+dataToScriptData (Map xs)      = ScriptDataMap [(dataToScriptData x, dataToScriptData y) | (x, y) <- xs]
+dataToScriptData (List xs)     = ScriptDataList $ dataToScriptData <$> xs
+dataToScriptData (I n)         = ScriptDataNumber n
+dataToScriptData (B bs)        = ScriptDataBytes bs
+
+toJSONValue :: PlutusTx.ToData a => a -> Aeson.Value
+toJSONValue = scriptDataToJson ScriptDataJsonDetailedSchema
+           . dataToScriptData
+           . PlutusTx.toData
+
+writeJSON :: PlutusTx.ToData a => FilePath -> a -> IO ()
+writeJSON file = LBS.writeFile file . encode . toJSONValue
+
+serialisedScript :: Script -> PlutusScript PlutusScriptV2
+serialisedScript = PlutusScriptSerialised . SBS.toShort . LBS.toStrict . serialise
+
+writeScript :: FilePath -> Script -> IO (Either (FileError ()) ())
+writeScript file script = writeFileTextEnvelope @(PlutusScript PlutusScriptV2) file Nothing
+                         $ serialisedScript script
+
+writeData :: PlutusTx.ToData a => FilePath -> a -> IO ()
+writeData = writeJSON
+
+decodeDatum :: (FromData a) => Aeson.Value -> Maybe a
+decodeDatum = unsafeFromRight . fmap (PlutusTx.fromBuiltinData . fromCardanoScriptData)
+            . scriptDataFromJson ScriptDataJsonDetailedSchema
+
+-------------------------------------------------
+-- Off-Chain Helper Functions and Types
+-------------------------------------------------
+type PlutusRational = Rational
+
+slotToPOSIXTime :: Slot -> POSIXTime
+slotToPOSIXTime = slotToBeginPOSIXTime preprodConfig
+
+posixTimeToSlot :: POSIXTime -> Slot
+posixTimeToSlot = posixTimeToEnclosingSlot preprodConfig
+
+-- | The preproduction testnet has not always had 1 second slots. Therefore, the default settings
+-- for SlotConfig are not usable on the testnet. To fix this, the proper SlotConfig must be
+-- normalized to "pretend" that the testnet has always used 1 second slot intervals.
+--
+-- The normalization is done by taking a slot time and subtracting the slot number from it.
+-- For example, slot 23210080 occurred at 1678893280 POSIXTime. So subtracting the slot number 
+-- from the time yields the normalized 0 time.
+preprodConfig :: SlotConfig
+preprodConfig = SlotConfig 1000 (POSIXTime 1655683200000)
+
+-- | Parse PubKeyHash from user supplied String
+readPubKeyHash :: Haskell.String -> Either Haskell.String PubKeyHash
+readPubKeyHash s = case fromHex $ fromString s of
+  Right (LedgerBytes bytes') -> Right $ PubKeyHash bytes'
+  Left msg                   -> Left $ "could not convert: " <> msg
+
+-- | Parse ValidatorHash from user supplied String
+readValidatorHash :: Haskell.String -> Either Haskell.String ValidatorHash
+readValidatorHash s = case fromHex $ fromString s of
+  Right (LedgerBytes bytes') -> Right $ ValidatorHash bytes'
+  Left msg                   -> Left $ "could not convert: " <> msg
+
+-- | Parse Currency from user supplied String
+readCurrencySymbol :: Haskell.String -> Either Haskell.String CurrencySymbol
+readCurrencySymbol s = case fromHex $ fromString s of
+  Right (LedgerBytes bytes') -> Right $ CurrencySymbol bytes'
+  Left msg                   -> Left $ "could not convert: " <> msg
+
+-- | Parse TokenName from user supplied String
+readTokenName :: Haskell.String -> Either Haskell.String TokenName
+readTokenName s = case fromHex $ fromString s of
+  Right (LedgerBytes bytes') -> Right $ TokenName bytes'
+  Left msg                   -> Left $ "could not convert: " <> msg
+
+getValidatorHash :: ValidatorHash -> B.ByteString
+getValidatorHash (ValidatorHash (BuiltinByteString vh)) = vh
+
+getPubKeyHash :: PubKeyHash -> B.ByteString
+getPubKeyHash pkh = (\(BuiltinByteString z) -> z) $ Api.getPubKeyHash pkh
+
+unsafeFromRight :: Either a b -> b
+unsafeFromRight (Right x) = x
+unsafeFromRight _ = Haskell.error "unsafeFromRight used on Left"

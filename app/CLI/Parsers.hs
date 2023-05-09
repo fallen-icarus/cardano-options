@@ -1,0 +1,273 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+module CLI.Parsers
+(
+  parseCommand
+) where
+
+import Options.Applicative
+
+import CardanoOptions
+import CLI.Types
+
+-------------------------------------------------
+-- Main Parsers
+-------------------------------------------------
+parseCommand :: Parser Command
+parseCommand = hsubparser $ mconcat
+  [ command "export-script"
+      (info parseExportScript $ progDesc "Export a dApp plutus script.")
+  , command "options-datum"
+      (info parseCreateOptionsDatum $ progDesc "Create a datum for the options validator.")
+  ]
+
+-------------------------------------------------
+-- Scripts Parser
+-------------------------------------------------
+parseExportScript :: Parser Command
+parseExportScript = hsubparser $ mconcat
+    [ command "beacon-policy"
+        (info pExportPolicy $ progDesc "Export the beacon policy for a specific trading pair.")
+    , command "options-script"
+        (info pExportOptions $ progDesc "Export the options validator script.")
+    ]
+  where
+    pExportPolicy :: Parser Command
+    pExportPolicy = ExportScript <$> pPolicy <*> pOutputFile
+
+    pExportOptions :: Parser Command
+    pExportOptions = ExportScript <$> pure OptionsScript <*> pOutputFile
+
+    pPolicy :: Parser Script
+    pPolicy = BeaconPolicy <$> pOptionsConfig
+
+-------------------------------------------------
+-- CreateOptionsDatum Parser
+-------------------------------------------------
+parseCreateOptionsDatum :: Parser Command
+parseCreateOptionsDatum = hsubparser $ mconcat
+    [ command "assets-datum"
+        (info pAssets $ progDesc "Create the datum for creating an Assets UTxO to back a contract.")
+    , command "proposal-datum"
+        (info pProposal $ progDesc "Create the datum for proposing a contract.")
+    , command "accept-datum"
+        (info pAccept $ progDesc "Create the datum for accepting a contract.")
+    ]
+  where
+    pAssets :: Parser Command
+    pAssets = CreateOptionsDatum <$> pAssetsForContract <*> pOutputFile
+
+    pProposal :: Parser Command
+    pProposal = CreateOptionsDatum <$> pProposedContract <*> pOutputFile
+
+    pAccept :: Parser Command
+    pAccept = CreateOptionsDatum <$> pActiveContract <*> pOutputFile
+    
+-------------------------------------------------
+-- Basic Helper Parsers
+-------------------------------------------------
+pOutputFile :: Parser FilePath
+pOutputFile = strOption
+  (  long "out-file"
+  <> metavar "FILE"
+  <> help "The output file."
+  <> completer (bashCompleter "file")
+  )
+
+pCurrentAsset :: Parser (CurrencySymbol,TokenName)
+pCurrentAsset = pCurrentAssetLovelace <|> ((,) <$> pCurrentAssetCurrencySymbol <*> pCurrentAssetTokenName)
+  where
+    pCurrentAssetLovelace :: Parser (CurrencySymbol,TokenName)
+    pCurrentAssetLovelace = flag' (adaSymbol,adaToken)
+      (  long "current-asset-is-lovelace"
+      <> help "The current asset is lovelace"
+      )
+
+    pCurrentAssetCurrencySymbol :: Parser CurrencySymbol
+    pCurrentAssetCurrencySymbol = option (eitherReader readCurrencySymbol)
+      (  long "current-asset-policy-id" 
+      <> metavar "STRING" 
+      <> help "The policy id of the current asset."
+      )
+
+    pCurrentAssetTokenName :: Parser TokenName
+    pCurrentAssetTokenName = option (eitherReader readTokenName)
+      (  long "current-asset-token-name"
+      <> metavar "STRING"
+      <> help "The token name (in hexidecimal) of the current asset."
+      )
+
+pDesiredAsset :: Parser (CurrencySymbol,TokenName)
+pDesiredAsset = pDesiredAssetLovelace <|> ((,) <$> pDesiredAssetCurrencySymbol <*> pDesiredAssetTokenName)
+  where
+    pDesiredAssetLovelace :: Parser (CurrencySymbol,TokenName)
+    pDesiredAssetLovelace = flag' (adaSymbol,adaToken)
+      (  long "desired-asset-is-lovelace"
+      <> help "The desired asset is lovelace"
+      )
+
+    pDesiredAssetCurrencySymbol :: Parser CurrencySymbol
+    pDesiredAssetCurrencySymbol = option (eitherReader readCurrencySymbol)
+      (  long "desired-asset-policy-id" 
+      <> metavar "STRING" 
+      <> help "The policy id of the desired asset."
+      )
+
+    pDesiredAssetTokenName :: Parser TokenName
+    pDesiredAssetTokenName = option (eitherReader readTokenName)
+      (  long "desired-asset-token-name"
+      <> metavar "STRING"
+      <> help "The token name (in hexidecimal) of the desired asset."
+      )
+
+pOptionsConfig :: Parser OptionsConfig
+pOptionsConfig = OptionsConfig <$> pCurrentAsset <*> pDesiredAsset
+
+pBeaconPolicy :: Parser CurrencySymbol
+pBeaconPolicy = option (eitherReader readCurrencySymbol)
+  (  long "beacon-policy-id"
+  <> metavar "STRING"
+  <> help "Policy id for that trading pair's beacon policy.")
+
+pCurrentAssetQuantity :: Parser Integer
+pCurrentAssetQuantity = option auto
+  (  long "quantity"
+  <> metavar "INT"
+  <> help "Quantity of current asset to be traded."
+  )
+
+pAssetsForContract :: Parser OptionsDatum
+pAssetsForContract = 
+  AssetsForContract 
+    <$> pBeaconPolicy 
+    <*> pCurrentAsset 
+    <*> pCurrentAssetQuantity
+    <*> pDesiredAsset
+
+pStrikePrice :: Parser PlutusRational
+pStrikePrice = unsafeRatio <$> pStrikePriceNum <*> pStrikePriceDen
+  where
+    pStrikePriceNum :: Parser Integer
+    pStrikePriceNum = option auto
+      ( long "strike-price-numerator"
+      <> metavar "INT"
+      <> help "The numerator of the strike price."
+      )
+
+    pStrikePriceDen :: Parser Integer
+    pStrikePriceDen = option auto
+      ( long "strike-price-denominator"
+      <> metavar "INT"
+      <> help "The denominator of the strike price."
+      )
+
+pAddress :: Parser Address
+pAddress = 
+    Address
+      <$> pPaymentCredential
+      <*> (pStakingCredential <|> pure Nothing)
+  where
+    pPaymentScriptCredential :: Parser Credential
+    pPaymentScriptCredential = ScriptCredential <$> option (eitherReader readValidatorHash)
+      (  long "payment-script-hash"
+      <> metavar "STRING"
+      <> help "The hash of the payment script used in the address."
+      )
+
+    pPaymentPubKeyCredential :: Parser Credential
+    pPaymentPubKeyCredential = PubKeyCredential <$> option (eitherReader readPubKeyHash)
+      ( long "payment-pubkey-hash"
+      <> metavar "STRING"
+      <> help "The hash of the payment pubkey used in the address."
+      )
+
+    pStakingScriptCredential :: Parser StakingCredential
+    pStakingScriptCredential = StakingHash . ScriptCredential <$> option (eitherReader readValidatorHash)
+      (  long "staking-script-hash"
+      <> metavar "STRING"
+      <> help "The hash of the staking script used in the address."
+      )
+
+    pStakingPubKeyCredential :: Parser StakingCredential
+    pStakingPubKeyCredential = StakingHash . PubKeyCredential <$> option (eitherReader readPubKeyHash)
+      (  long "staking-pubkey-hash"
+      <> metavar "STRING"
+      <> help "The hash of the staking pubkey used in the address."
+      )
+
+    pPaymentCredential :: Parser Credential
+    pPaymentCredential = pPaymentPubKeyCredential <|> pPaymentScriptCredential
+
+    pStakingCredential :: Parser (Maybe StakingCredential)
+    pStakingCredential = Just <$> (pStakingPubKeyCredential <|> pStakingScriptCredential)
+
+pPremiumAsset :: Parser (CurrencySymbol,TokenName)
+pPremiumAsset = pPremiumAssetLovelace <|> ((,) <$> pPremiumAssetCurrencySymbol <*> pPremiumAssetTokenName)
+  where
+    pPremiumAssetLovelace :: Parser (CurrencySymbol,TokenName)
+    pPremiumAssetLovelace = flag' (adaSymbol,adaToken)
+      (  long "premium-asset-is-lovelace"
+      <> help "The premium asset is lovelace"
+      )
+
+    pPremiumAssetCurrencySymbol :: Parser CurrencySymbol
+    pPremiumAssetCurrencySymbol = option (eitherReader readCurrencySymbol)
+      (  long "premium-asset-policy-id" 
+      <> metavar "STRING" 
+      <> help "The policy id of the premium asset."
+      )
+
+    pPremiumAssetTokenName :: Parser TokenName
+    pPremiumAssetTokenName = option (eitherReader readTokenName)
+      (  long "premium-asset-token-name"
+      <> metavar "STRING"
+      <> help "The token name (in hexidecimal) of the premium asset."
+      )
+
+pPremium :: Parser Integer
+pPremium = option auto
+  (  long "premium"
+  <> metavar "INT"
+  <> help "The amount for the premium."
+  )
+
+pExpiration :: Parser POSIXTime
+pExpiration = slotToPOSIXTime . Slot <$> option auto
+  (  long "expiration"
+  <> metavar "INT"
+  <> help "The slot at which the contract expires."
+  )
+
+pProposedContract :: Parser OptionsDatum
+pProposedContract = 
+  ProposedContract
+    <$> pBeaconPolicy
+    <*> pCurrentAsset
+    <*> pCurrentAssetQuantity
+    <*> pDesiredAsset
+    <*> pStrikePrice
+    <*> pAddress -- ^ Creator's address
+    <*> pPremiumAsset
+    <*> pPremium
+    <*> pExpiration
+
+pContractId :: Parser TokenName
+pContractId = option (eitherReader readTokenName)
+  (  long "contract-id"
+  <> metavar "STRING"
+  <> help "The ContractID for this contract."
+  )
+
+pActiveContract :: Parser OptionsDatum
+pActiveContract = 
+  ActiveContract
+    <$> pBeaconPolicy
+    <*> pCurrentAsset
+    <*> pCurrentAssetQuantity
+    <*> pDesiredAsset
+    <*> pStrikePrice
+    <*> pAddress -- ^ Creator's address
+    <*> pPremiumAsset
+    <*> pPremium
+    <*> pExpiration
+    <*> pContractId

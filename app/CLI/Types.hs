@@ -18,6 +18,10 @@ data Command
   | ExtractAddressHashes Text Output
   | GenerateBech32Address Address Output
   | Convert Convert
+  | QueryBeacons Query
+
+data Query
+  = QueryAvailableContracts Network CurrencySymbol Output
 
 data Convert
   = POSIXTimeToSlot POSIXTime
@@ -46,4 +50,48 @@ instance ToJSON AddressInfo' where
            , "staking_pubkey_hash" .= addressStakeKeyHash
            , "staking_script_hash" .= addressStakeScriptHash
            , "network_tag" .= addressNetworkTag
+           ]
+
+data Asset = Asset
+  { assetPolicyId :: String
+  , assetTokenName :: String
+  , assetQuantity :: Integer
+  } deriving (Show)
+
+instance ToJSON Asset where
+  toJSON Asset{..} =
+    object [ "asset" .= if assetPolicyId == "lovelace" 
+                        then "lovelace" 
+                        else assetPolicyId <> "." <> assetTokenName
+           , "quantity" .= assetQuantity
+           ]
+
+data UTxOType = Assets | Proposal | Active deriving (Show)
+
+data UTxOInfo = UTxOInfo
+  { txHash :: String
+  , outputIndex :: String
+  , utxoValue :: [Asset]
+  , optionInfo :: OptionsDatum
+  }
+
+instance ToJSON UTxOInfo where
+  toJSON UTxOInfo{..} =
+    object [ "tx_hash" .= txHash
+           , "output_index" .= outputIndex
+           , "utxo_assets" .= utxoValue
+           , "info" .= optionInfo
+           ]
+
+data AvailableContractInfo = AvailableContractInfo
+  { address :: String
+  , assetsUTxO :: UTxOInfo
+  , proposedUTxOs :: [UTxOInfo]
+  }
+
+instance ToJSON AvailableContractInfo where
+  toJSON AvailableContractInfo{..} =
+    object [ "address" .= address
+           , "assets_utxo" .= assetsUTxO
+           , "proposed_utxos" .= proposedUTxOs
            ]

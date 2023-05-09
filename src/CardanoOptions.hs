@@ -901,3 +901,62 @@ getPubKeyHash pkh = (\(BuiltinByteString z) -> z) $ Api.getPubKeyHash pkh
 unsafeFromRight :: Either a b -> b
 unsafeFromRight (Right x) = x
 unsafeFromRight _ = Haskell.error "unsafeFromRight used on Left"
+
+-------------------------------------------------
+-- ToJSON Instances and Helper Functions
+-------------------------------------------------
+toEncodedText :: TokenName -> Text
+toEncodedText (TokenName (BuiltinByteString tn)) = encodeByteString tn
+
+toAsset :: (CurrencySymbol,TokenName) -> Text
+toAsset (currSym,tokName)
+  | currSym == adaSymbol = "lovelace"
+  | otherwise = pack (Haskell.show currSym) Haskell.<> "." Haskell.<> toEncodedText tokName
+
+idToString :: TokenName -> Haskell.String
+idToString tn = Haskell.show $ tokenNameAsTxId tn
+
+toStakePubKeyHash :: Address -> Maybe PubKeyHash
+toStakePubKeyHash (Address _ (Just (StakingHash (PubKeyCredential pkh)))) = Just pkh
+toStakePubKeyHash _ = Nothing
+
+toStakeValidatorHash :: Address -> Maybe ValidatorHash
+toStakeValidatorHash (Address _ (Just (StakingHash (ScriptCredential vh)))) = Just vh
+toStakeValidatorHash _ = Nothing
+
+instance ToJSON OptionsDatum where
+  toJSON AssetsForContract{..} =
+    object [ "beacon_symbol" .= Haskell.show beaconSymbol
+           , "current_asset" .= toAsset currentAsset
+           , "quantity" .= currentAssetQuantity
+           , "desired_asset" .= toAsset desiredAsset
+           ]
+  toJSON ProposedContract{..} =
+    object [ "beacon_symbol" .= Haskell.show beaconSymbol
+           , "current_asset" .= toAsset currentAsset
+           , "quantity" .= currentAssetQuantity
+           , "desired_asset" .= toAsset desiredAsset
+           , "strike_price" .= strikePrice
+           , "writer_address_payment_pubkey_hash" .= (Haskell.show <$> toPubKeyHash creatorAddress)
+           , "writer_address_payment_script_hash" .= (Haskell.show <$> toValidatorHash creatorAddress)
+           , "writer_address_staking_pubkey_hash" .= (Haskell.show <$> toStakePubKeyHash creatorAddress)
+           , "writer_address_staking_script_hash" .= (Haskell.show <$> toStakeValidatorHash creatorAddress)
+           , "premium_asset" .= toAsset premiumAsset
+           , "premium" .= premium
+           , "expiration_slot" .= getSlot (posixTimeToSlot expiration)
+           ]
+  toJSON ActiveContract{..} =
+    object [ "beacon_symbol" .= Haskell.show beaconSymbol
+           , "current_asset" .= toAsset currentAsset
+           , "quantity" .= currentAssetQuantity
+           , "desired_asset" .= toAsset desiredAsset
+           , "strike_price" .= strikePrice
+           , "writer_address_payment_pubkey_hash" .= (Haskell.show <$> toPubKeyHash creatorAddress)
+           , "writer_address_payment_script_hash" .= (Haskell.show <$> toValidatorHash creatorAddress)
+           , "writer_address_staking_pubkey_hash" .= (Haskell.show <$> toStakePubKeyHash creatorAddress)
+           , "writer_address_staking_script_hash" .= (Haskell.show <$> toStakeValidatorHash creatorAddress)
+           , "premium_asset" .= toAsset premiumAsset
+           , "premium" .= premium
+           , "expiration_slot" .= getSlot (posixTimeToSlot expiration)
+           , "contract_id" .= idToString contractId
+           ]

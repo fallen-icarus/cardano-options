@@ -30,6 +30,8 @@ parseCommand = hsubparser $ mconcat
       (info pGenerateBech32Address $ progDesc "Generate a bech32 address from hashes.")
   , command "convert"
       (info pConvert $ progDesc "Convert POSIXTime <--> Slot.")
+  , command "query"
+      (info parseQueryBeacons $ progDesc "Query the dApp's beacons.")
   ]
 
 -------------------------------------------------
@@ -195,6 +197,18 @@ pConvert = Convert <$> (pPOSIXTime <|> pSlot)
       <> metavar "INT"
       <> help "Convert slot number to POSIX time."
       )
+
+-------------------------------------------------
+-- QueryBeacons Parser
+-------------------------------------------------
+parseQueryBeacons :: Parser Command
+parseQueryBeacons = fmap QueryBeacons . hsubparser $ mconcat
+    [ command "available-contracts"
+        (info pAvailableContracts $ progDesc "Query all available contracts for purchase.")
+    ]
+  where
+    pAvailableContracts :: Parser Query
+    pAvailableContracts = QueryAvailableContracts <$> pNetwork <*> pBeaconPolicy <*> pOutput
 
 -------------------------------------------------
 -- Basic Helper Parsers
@@ -420,3 +434,12 @@ pOutput = pStdOut <|> File <$> pOutputFile
       (  long "stdout"
       <> help "Display to stdout."
       )
+
+pNetwork :: Parser Network
+pNetwork = pPreProdTestnet
+  where
+    pPreProdTestnet :: Parser Network
+    pPreProdTestnet = PreProdTestnet <$> strOption
+      (  long "preprod-testnet"
+      <> metavar "STRING"
+      <> help "Query the preproduction testnet using the Blockfrost Api with the supplied api key.")

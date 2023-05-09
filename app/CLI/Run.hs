@@ -15,6 +15,7 @@ import Data.Text.Encoding as TE
 import qualified Codec.Binary.Encoding as E
 
 import CLI.Types
+import CLI.Query
 import CardanoOptions
 import Cardano.Address.Style.Shelley hiding (unsafeFromRight)
 import Cardano.Address (fromBech32,unNetworkTag,bech32)
@@ -29,6 +30,7 @@ runCommand cmd = case cmd of
   ExtractAddressHashes addr output -> runExtractAddressHashesCmd addr output
   GenerateBech32Address addr output -> runGenerateBech32AddressCmd addr output
   Convert convert -> runConversion convert
+  QueryBeacons query -> runQuery query
 
 runExportScriptCmd :: Script -> FilePath -> IO ()
 runExportScriptCmd script file = do
@@ -91,6 +93,11 @@ runGenerateBech32AddressCmd (Address paymentCred mStakeCred) output = do
 runConversion :: Convert -> IO ()
 runConversion (POSIXTimeToSlot p) = print $ getSlot $ posixTimeToSlot p
 runConversion (SlotToPOSIXTime s) = print $ getPOSIXTime $ slotToPOSIXTime s
+
+runQuery :: Query -> IO ()
+runQuery query = case query of
+  QueryAvailableContracts network policyId output -> 
+    runQueryAvailableContracts network policyId >>= toOutput output
 
 -------------------------------------------------
 -- Helper Functions

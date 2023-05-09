@@ -83,8 +83,8 @@ executable cardano-options
         CLI.Types
       , CLI.Parsers
       , CLI.Run
-      -- , CLI.BlockfrostApi
-      -- , CLI.Query
+      , CLI.BlockfrostApi
+      , CLI.Query
     build-depends:    
       cardano-options,
       optparse-applicative,

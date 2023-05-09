@@ -33,6 +33,7 @@ module CardanoOptions
   ValidatorHash(..),
   Address(..),
   txIdAsToken,
+  tokenNameAsTxId,
   adaSymbol,
   adaToken,
   unsafeRatio,

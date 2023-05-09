@@ -22,6 +22,10 @@ data Command
 
 data Query
   = QueryAvailableContracts Network CurrencySymbol Output
+  | QueryOwnAssetsUTxOs Network CurrencySymbol OptionsAddress Output
+  | QueryOwnProposedUTxOs Network CurrencySymbol OptionsAddress Output
+  | QueryOwnActiveUTxOs Network CurrencySymbol OptionsAddress Output
+  | QuerySpecificContract Network CurrencySymbol TokenName Output
 
 data Convert
   = POSIXTimeToSlot POSIXTime
@@ -31,6 +35,11 @@ data Script = BeaconPolicy OptionsConfig | OptionsScript
 
 -- | For when saving to file is optional
 data Output = Stdout | File FilePath
+
+newtype OptionsAddress = OptionsAddress String
+
+instance Show OptionsAddress where
+  show (OptionsAddress s) = s
 
 data Network 
   = PreProdTestnet String  -- ^ Api key

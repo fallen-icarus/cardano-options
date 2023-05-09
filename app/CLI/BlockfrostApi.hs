@@ -10,7 +10,11 @@ module CLI.BlockfrostApi
 (
   BlockfrostApiKey(..),
 
-  queryAvailableContracts
+  queryAvailableContracts,
+  queryOwnAssets,
+  queryOwnProposals,
+  queryOwnActive,
+  querySpecificContract
 ) where
 
 import Servant.API
@@ -143,9 +147,56 @@ queryAvailableContracts apiKey policyId = do
       proposed = zipWith convertToUTxOInfo proposalUTxOs proposedInfo
   return $ concat $ zipWith3 convertToAvailableContractInfo addrs assets proposed
 
+queryOwnAssets :: BlockfrostApiKey -> String -> String -> ClientM [UTxOInfo]
+queryOwnAssets apiKey policyId addr = do
+  let beaconAddr = BeaconAddress addr
+      beaconId = BeaconId (policyId,"417373657473")
+  -- | Get all the beacon UTxOs for the address.
+  beaconUTxOs <- beaconInfoApi apiKey beaconAddr beaconId
+  -- | Get all the datums attached to the beacon UTxOs.
+  infos <- fetchDatumsLenient apiKey $ map rawBeaconDataHash beaconUTxOs
+  return $ convertToUTxOInfo beaconUTxOs infos
+
+queryOwnProposals :: BlockfrostApiKey -> String -> String -> ClientM [UTxOInfo]
+queryOwnProposals apiKey policyId addr = do
+  let beaconAddr = BeaconAddress addr
+      beaconId = BeaconId (policyId,"50726f706f736564")
+  -- | Get all the beacon UTxOs for the address.
+  beaconUTxOs <- beaconInfoApi apiKey beaconAddr beaconId
+  -- | Get all the datums attached to the beacon UTxOs.
+  infos <- fetchDatumsLenient apiKey $ map rawBeaconDataHash beaconUTxOs
+  return $ convertToUTxOInfo beaconUTxOs infos
+
+queryOwnActive :: BlockfrostApiKey -> String -> String -> ClientM [UTxOInfo]
+queryOwnActive apiKey policyId addr = do
+  let beaconAddr = BeaconAddress addr
+      beaconId = BeaconId (policyId,"416374697665")
+  -- | Get all the beacon UTxOs for the address.
+  beaconUTxOs <- beaconInfoApi apiKey beaconAddr beaconId
+  -- | Get all the datums attached to the beacon UTxOs.
+  infos <- fetchDatumsLenient apiKey $ map rawBeaconDataHash beaconUTxOs
+  return $ convertToUTxOInfo beaconUTxOs infos
+
+querySpecificContract :: BlockfrostApiKey -> String -> String -> ClientM [UTxOInfo]
+querySpecificContract apiKey policyId contractID = do
+  let contractBeacon = BeaconId (policyId,contractID)
+      activeBeacon = policyId <> "416374697665"
+  -- | Get all the addresses currently holding the contractId beacon.
+  -- There should only be at most two.
+  addrs <- beaconAddressListApi apiKey contractBeacon
+  -- | Get all the beacon UTxOs for the addresses.
+  beaconUTxOs <- filterForAsset activeBeacon . concat 
+             <$> mapM (\z -> beaconInfoApi apiKey z contractBeacon) addrs
+  -- | Get all the datums attached to the beacon UTxOs.
+  infos <- fetchDatumsLenient apiKey $ map rawBeaconDataHash beaconUTxOs
+  return $ convertToUTxOInfo beaconUTxOs infos
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
+filterForAsset :: String -> [RawBeaconInfo] -> [RawBeaconInfo]
+filterForAsset asset = filter (isJust . find ((==asset) . rawUnit) . rawAmount)
+
 -- | Skips ones that fail to decode.
 fetchDatumsLenient :: BlockfrostApiKey -> [Maybe String] -> ClientM (Map String OptionsDatum)
 fetchDatumsLenient apiKey dhs =

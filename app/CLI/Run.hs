@@ -98,6 +98,14 @@ runQuery :: Query -> IO ()
 runQuery query = case query of
   QueryAvailableContracts network policyId output -> 
     runQueryAvailableContracts network policyId >>= toOutput output
+  QueryOwnAssetsUTxOs network policyId addr output ->
+    runQueryOwnAssets network policyId addr >>= toOutput output
+  QueryOwnProposedUTxOs network policyId addr output ->
+    runQueryOwnProposals network policyId addr >>= toOutput output
+  QueryOwnActiveUTxOs network policyId addr output ->
+    runQueryOwnActive network policyId addr >>= toOutput output
+  QuerySpecificContract network policyId contractID output ->
+    runQuerySpecificContract network policyId contractID >>= toOutput output
 
 -------------------------------------------------
 -- Helper Functions

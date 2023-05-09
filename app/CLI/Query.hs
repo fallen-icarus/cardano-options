@@ -8,7 +8,8 @@ module CLI.Query
   runQueryOwnAssets,
   runQueryOwnProposals,
   runQueryOwnActive,
-  runQuerySpecificContract
+  runQuerySpecificContract,
+  runQueryOwnContracts
 ) where
 
 import Servant.Client
@@ -68,6 +69,16 @@ runQuerySpecificContract (PreProdTestnet apiKey) currSym tokName = do
   res <- runClientM 
           (Blockfrost.querySpecificContract apiKey' (show currSym) (show $ tokenNameAsTxId tokName)) 
           env
+  case res of
+    Right r -> return r
+    Left err -> throw err
+
+runQueryOwnContracts :: Network -> CurrencySymbol -> OptionsAddress -> IO [Asset]
+runQueryOwnContracts (PreProdTestnet apiKey) currSym addr = do
+  manager' <- newManager tlsManagerSettings
+  let env = mkClientEnv manager' (BaseUrl Https "cardano-preprod.blockfrost.io" 443 "api/v0")
+      apiKey' = BlockfrostApiKey apiKey
+  res <- runClientM (Blockfrost.queryOwnContracts apiKey' (show currSym) (show addr)) env
   case res of
     Right r -> return r
     Left err -> throw err

@@ -213,6 +213,8 @@ parseQueryBeacons = fmap QueryBeacons . hsubparser $ mconcat
         (info pOwnActive $ progDesc "Query all own active UTxOs for a given trading pair.")
     , command "specific-contract"
         (info pSpecificContract $ progDesc "Query the information for a specific active contract.")
+    , command "own-contracts"
+        (info pOwnContracts $ progDesc "Lookup all contractIDs in a user's address.")
     ]
   where
     pAvailableContracts :: Parser Query
@@ -229,6 +231,9 @@ parseQueryBeacons = fmap QueryBeacons . hsubparser $ mconcat
 
     pSpecificContract :: Parser Query
     pSpecificContract = QuerySpecificContract <$> pNetwork <*> pBeaconPolicy <*> pContractId <*> pOutput
+
+    pOwnContracts :: Parser Query
+    pOwnContracts = QueryOwnContracts <$> pNetwork <*> pBeaconPolicy <*> pOptionsAddr <*> pOutput
 
     pOptionsAddr :: Parser OptionsAddress
     pOptionsAddr = OptionsAddress <$> pBech32Address

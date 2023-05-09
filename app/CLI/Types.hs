@@ -26,6 +26,7 @@ data Query
   | QueryOwnProposedUTxOs Network CurrencySymbol OptionsAddress Output
   | QueryOwnActiveUTxOs Network CurrencySymbol OptionsAddress Output
   | QuerySpecificContract Network CurrencySymbol TokenName Output
+  | QueryOwnContracts Network CurrencySymbol OptionsAddress Output
 
 data Convert
   = POSIXTimeToSlot POSIXTime

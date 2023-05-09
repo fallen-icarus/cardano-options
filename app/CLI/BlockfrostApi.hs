@@ -14,7 +14,8 @@ module CLI.BlockfrostApi
   queryOwnAssets,
   queryOwnProposals,
   queryOwnActive,
-  querySpecificContract
+  querySpecificContract,
+  queryOwnContracts
 ) where
 
 import Servant.API
@@ -113,13 +114,19 @@ type BlockfrostApi
     :> Capture "asset" BeaconId
     :> Get '[JSON] [RawBeaconInfo]
 
+  :<|> "addresses"
+    :> Header' '[Required] "project_id" BlockfrostApiKey
+    :> Capture "address" BeaconAddress
+    :> "utxos"
+    :> Get '[JSON] [RawBeaconInfo]
+
   :<|> "scripts"
     :> Header' '[Required] "project_id" BlockfrostApiKey
     :> "datum"
     :> Capture "datum_hash" String
     :> Get '[JSON] Value
 
-beaconAddressListApi :<|> beaconInfoApi :<|> datumApi = client api
+beaconAddressListApi :<|> beaconInfoApi :<|> addressInfoApi :<|> datumApi = client api
   where
     api :: Proxy BlockfrostApi
     api = Proxy
@@ -190,6 +197,14 @@ querySpecificContract apiKey policyId contractID = do
   -- | Get all the datums attached to the beacon UTxOs.
   infos <- fetchDatumsLenient apiKey $ map rawBeaconDataHash beaconUTxOs
   return $ convertToUTxOInfo beaconUTxOs infos
+
+queryOwnContracts :: BlockfrostApiKey -> String -> String -> ClientM [Asset]
+queryOwnContracts apiKey policyId addr = do
+  let beaconAddr = BeaconAddress addr
+  -- | Get all the assets at the address.
+  utxos <- map convertToAsset . concatMap rawAmount 
+       <$> addressInfoApi apiKey beaconAddr
+  return $ filter ((== policyId) . assetPolicyId) utxos
 
 -------------------------------------------------
 -- Helper Functions

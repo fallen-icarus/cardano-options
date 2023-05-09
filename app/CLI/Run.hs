@@ -106,6 +106,8 @@ runQuery query = case query of
     runQueryOwnActive network policyId addr >>= toOutput output
   QuerySpecificContract network policyId contractID output ->
     runQuerySpecificContract network policyId contractID >>= toOutput output
+  QueryOwnContracts network policyId addr output ->
+    runQueryOwnContracts network policyId addr >>= toOutput output
 
 -------------------------------------------------
 -- Helper Functions

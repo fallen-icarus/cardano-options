@@ -37,7 +37,7 @@ import Ledger.Ada (lovelaceValueOf)
 import Plutus.Script.Utils.V2.Scripts as UScripts
 import Plutus.Trace
 import Wallet.Emulator.Wallet
-import Data.List (foldl')
+import Data.List (foldl',repeat)
 import Prelude as Haskell (Semigroup (..), String)
 import Cardano.Api.Shelley (ExecutionUnits (..),ProtocolParameters (..))
 import Ledger.Tx.Internal as I
@@ -136,7 +136,6 @@ data ExecuteParams = ExecuteParams
   , executeBeaconPolicies :: [MintingPolicy]
   , executeVal :: Validator
   , executeAddresses :: [Address]
-  , executeContractIds :: [TokenName]
   , executeSpecificUTxOs :: [[(OptionsDatum,Value)]]
   , executeWithTTE :: Bool
   , executeCreatorAddresses :: [Address]
@@ -527,7 +526,7 @@ executeContract ExecuteParams{..} = do
   let beaconPolicyHashes = map mintingPolicyHash executeBeaconPolicies
       beaconRedeemer = toRedeemer executeBeaconRedeemer
       
-      executeRedeemers = map (toRedeemer . ExecuteContract) executeContractIds
+      executeRedeemers = repeat $ toRedeemer $ ExecuteContract
 
       toDatum' = TxOutDatumInline . toDatum
 

@@ -152,7 +152,7 @@ data OptionsRedeemer
   = CloseAssets -- ^ Close an unused AssetsForContract UTxO.
   | CloseProposedContracts
   | AcceptContract
-  | ExecuteContract TokenName -- ^ The contract ID of the contract to be executed.
+  | ExecuteContract
   | CloseExpiredContract -- ^ Reclaim assets after a contract expires without being executed.
   deriving (Haskell.Show,Generic)
 
@@ -373,21 +373,18 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} =
       -- executed this tx. The minting policy does all the required checks.
       traceIfFalse "Exactly one Active beacon not minted" $
         valueOf (txInfoMint info) (beaconSymbol optionsDatum) (TokenName "Active") == 1
-    ExecuteContract contractId' ->
+    ExecuteContract ->
       -- | The UTxO must have an Active beacon. This also implies that the UTxO has
       -- an ActiveContractDatum.
       traceIfFalse "Input does not have an Active beacon" 
         (valueOf inputValue (beaconSymbol optionsDatum) (TokenName "Active") == 1) &&
-      -- | The input must have the corresponding contractID.
-      traceIfFalse "This input is for a different contract"
-        (contractId optionsDatum == contractId') &&
       -- | The contract must not be expired.
       traceIfFalse "Contract is expired" (not $ contractIsExpired executionTime) &&
       -- | Exactly one ContractID must be burned. The other will be used as a receipt of
       -- execution to guarantee unique payments. This prevents double satisfaction despite
       -- composing executions.
       traceIfFalse "One ContractID not burned"
-        (valueOf minted (beaconSymbol optionsDatum) contractId' == (-1)) &&
+        (valueOf minted (beaconSymbol optionsDatum) (contractId optionsDatum) == (-1)) &&
       -- | All Active beacons among tx inputs must be burned.
       traceIfFalse "Active beacons not burned."
         ( valueOf totalInputValue (beaconSymbol optionsDatum) (TokenName "Active") == 
@@ -398,7 +395,7 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} =
       --       <> (uncurry singleton desiredAsset) (ceiling $ currentAssetQuantity * strikePrice)
       --       <> 1 ContractID
       -- The 5 ADA was the creator's deposit from the AssetsForContract UTxO.
-      traceIfFalse "Creator not properly paid" (creatorPaid contractId')
+      traceIfFalse "Creator not properly paid" (creatorPaid $ contractId optionsDatum)
     CloseExpiredContract ->
       -- | The UTxO must have an ActiveContract datum.
       traceIfFalse "Datum is not an ActiveContract datum" (encodeDatum optionsDatum == 2) &&

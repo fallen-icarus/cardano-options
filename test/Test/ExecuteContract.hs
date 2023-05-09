@@ -175,7 +175,6 @@ successfullyExecuteSingleContract = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -460,7 +459,6 @@ successfullyExecuteMultipleContractsFromSameAddress = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1,optionsAddr1]
-      , executeContractIds = [targetId1,targetId2]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -759,7 +757,6 @@ successfullyExecuteMultipleContractsFromDifferentAddressesButSamePolicy = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1,optionsAddr2]
-      , executeContractIds = [targetId1,targetId2]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -1059,7 +1056,6 @@ successfullyExecuteMultipleContractsFromDifferentAddressesAndPolicy = do
       , executeBeaconPolicies = [optionsBeaconPolicy1,optionsBeaconPolicy2]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1,optionsAddr2]
-      , executeContractIds = [targetId1,targetId2]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -1211,7 +1207,6 @@ missingActiveBeacon = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -1221,163 +1216,6 @@ missingActiveBeacon = do
       , executeCreatorAddresses = [creatorAddr1]
       , executeCreatorPayments =
           []
-      , executeWithTTE = True
-      }
-
-redeemerContractIdDoesntMatchDatum :: EmulatorTrace ()
-redeemerContractIdDoesntMatchDatum = do
-  h1 <- activateContractWallet (knownWallet 1) endpoints
-  h2 <- activateContractWallet (knownWallet 5) endpoints
-
-  let optionsStakingCred1 = PubKeyCredential
-                          $ unPaymentPubKeyHash
-                          $ mockWalletPaymentPubKeyHash
-                          $ knownWallet 1
-      assetsDatum1 = AssetsForContract
-        { beaconSymbol = optionsBeaconPolicySym1
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        }
-      optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
-                             (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
-  
-  callEndpoint @"create-assets-utxo" h1 $
-    AssetsParams
-      { assetsBeaconsMinted = [("Assets",1)]
-      , assetsBeaconRedeemer = MintAssetsBeacon
-      , assetsBeaconPolicy = optionsBeaconPolicy1
-      , assetsAddress = optionsAddr1
-      , assetsInfo = 
-          [ ( Just assetsDatum1
-            , lovelaceValueOf 5_000_000 
-           <> singleton optionsBeaconPolicySym1 "Assets" 1
-           <> lovelaceValueOf 100_000_000
-            )
-          ]
-      , assetsAsInline = True
-      }
-
-  void $ waitUntilSlot 2
-
-  let proposeDatum1 = ProposedContract
-        { beaconSymbol = optionsBeaconPolicySym1
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10_000_000
-        , creatorAddress = creatorAddr1
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        }
-  
-  callEndpoint @"propose-contract(s)" h1 $
-    ProposeParams
-      { proposeBeaconsMinted = [("Proposed",1)]
-      , proposeBeaconRedeemer = MintProposedBeacons
-      , proposeBeaconPolicy = optionsBeaconPolicy1
-      , proposeAddress = optionsAddr1
-      , proposeInfo = 
-          [ ( Just proposeDatum1
-            , lovelaceValueOf 3_000_000 
-           <> singleton optionsBeaconPolicySym1 "Proposed" 1
-           )
-          ]
-      , proposeAsInline = True
-      }
-
-  void $ waitUntilSlot 6
-
-  targetHash1 <- txIdWithValue ( lovelaceValueOf 5_000_000 
-                              <> singleton optionsBeaconPolicySym1 "Assets" 1
-                              <> lovelaceValueOf 100_000_000
-                               )
-
-  let targetId1 = txIdAsToken targetHash1
-      activeDatum1 = ActiveContract
-        { beaconSymbol = optionsBeaconPolicySym1
-        , currentAsset = (adaSymbol,adaToken)
-        , currentAssetQuantity = 100_000_000
-        , desiredAsset = testToken1
-        , strikePrice = unsafeRatio 1 10_000_000
-        , creatorAddress = creatorAddr1
-        , premiumAsset = (adaSymbol,adaToken)
-        , premium = 10_000_000
-        , expiration = slotToBeginPOSIXTime def 20
-        , contractId = targetId1
-        }
-           
-  callEndpoint @"accept-contract(s)" h2 $
-    MultiAcceptParams
-      { multiAcceptBeaconsMinted = [[("Active",1),("Assets",-1),("Proposed",-1),(targetId1,2)]]
-      , multiAcceptBeaconRedeemer = MintActiveBeacon targetId1 optionsStakingCred1
-      , multiAcceptBeaconPolicies = [optionsBeaconPolicy1]
-      , multiAcceptOptionsVal = optionsValidator
-      , multiAcceptOptionsAddresses = [optionsAddr1]
-      , multiAcceptSpecificUTxOs = 
-          [ [ ( proposeDatum1
-              , lovelaceValueOf 3_000_000 
-             <> singleton optionsBeaconPolicySym1 "Proposed" 1
-              )
-            , ( assetsDatum1
-              , lovelaceValueOf 5_000_000 
-             <> singleton optionsBeaconPolicySym1 "Assets" 1
-             <> lovelaceValueOf 100_000_000
-              )
-            ]
-          ]
-      , multiAcceptChangeAddresses = [optionsAddr1]
-      , multiAcceptChangeOutputs = 
-          [ [ ( Just activeDatum1
-              , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySym1 "Active" 1
-            <> singleton optionsBeaconPolicySym1 targetId1 1
-            <> lovelaceValueOf 100_000_000
-              )
-            ]
-          ]
-      , multiAcceptPremiumAddresses = [creatorAddr1]
-      , multiAcceptPremiumOutput = 
-          [ [ ( Nothing
-              ,  lovelaceValueOf 10_000_000
-              <> lovelaceValueOf 3_000_000
-              )
-            ]
-          ]
-      , multiAcceptDatumAsInline = True
-      , multiAcceptWithTTL = True
-      }
-
-  void $ waitUntilSlot 8
-
-  callEndpoint @"execute-contract(s)" h2 $
-    ExecuteParams
-      { executeBeaconsBurned = [[("Active",-1),(targetId1,-1)]]
-      , executeBeaconRedeemer = BurnBeacons
-      , executeBeaconPolicies = [optionsBeaconPolicy1]
-      , executeVal = optionsValidator
-      , executeAddresses = [optionsAddr1]
-      , executeContractIds = [adaToken]
-      , executeSpecificUTxOs = 
-          [ [ ( activeDatum1
-              , lovelaceValueOf 5_000_000
-            <> singleton optionsBeaconPolicySym1 "Active" 1
-            <> singleton optionsBeaconPolicySym1 targetId1 1
-            <> lovelaceValueOf 100_000_000
-              )
-            ]
-          ]
-      , executeCreatorAddresses = [creatorAddr1]
-      , executeCreatorPayments =
-          [ [ ( Nothing
-              , lovelaceValueOf 5_000_000
-            <> (uncurry singleton testToken1) 10
-            <> singleton optionsBeaconPolicySym1 targetId1 1
-              )
-            ]
-          ]
       , executeWithTTE = True
       }
 
@@ -1516,7 +1354,6 @@ contractIsExpired = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -1673,7 +1510,6 @@ bothContractIdsBurned = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -1829,7 +1665,6 @@ noContractIDsBurned = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -1986,7 +1821,6 @@ activeBeaconNotBurned = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -2143,7 +1977,6 @@ creatorNotPaidReceipt = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -2299,7 +2132,6 @@ creatorNotPaidEnoughDesiredAsset = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -2456,7 +2288,6 @@ creatorNotReturnedMinDeposit = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -2620,7 +2451,6 @@ paymentToWrongAddress = do
       , executeBeaconPolicies = [optionsBeaconPolicy1]
       , executeVal = optionsValidator
       , executeAddresses = [optionsAddr1]
-      , executeContractIds = [targetId1]
       , executeSpecificUTxOs = 
           [ [ ( activeDatum1
               , lovelaceValueOf 5_000_000
@@ -2652,8 +2482,6 @@ tests = do
   testGroup "Execute Contract(s)"
     [ checkPredicateOptions opts "Fail if input is missing Active beacon"
         (Test.not assertNoFailedTransactions) missingActiveBeacon
-    , checkPredicateOptions opts "Fail if redeemer ContractID doesn't match datum"
-        (Test.not assertNoFailedTransactions) redeemerContractIdDoesntMatchDatum
     , checkPredicateOptions opts "Fail if contract is expired"
         (Test.not assertNoFailedTransactions) contractIsExpired
     , checkPredicateOptions opts "Fail if both ContractIDs burned"

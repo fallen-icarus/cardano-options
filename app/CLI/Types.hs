@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module CLI.Types where
 
 import Data.Text
@@ -104,4 +106,41 @@ instance ToJSON AvailableContractInfo where
     object [ "address" .= address
            , "assets_utxo" .= assetsUTxO
            , "proposed_utxos" .= proposedUTxOs
+           ]
+
+instance ToJSON OptionsDatum where
+  toJSON AssetsForContract{..} =
+    object [ "beacon_symbol" .= show beaconSymbol
+           , "current_asset" .= toAsset currentAsset
+           , "quantity" .= currentAssetQuantity
+           , "desired_asset" .= toAsset desiredAsset
+           ]
+  toJSON ProposedContract{..} =
+    object [ "beacon_symbol" .= show beaconSymbol
+           , "current_asset" .= toAsset currentAsset
+           , "quantity" .= currentAssetQuantity
+           , "desired_asset" .= toAsset desiredAsset
+           , "strike_price" .= strikePrice
+           , "writer_address_payment_pubkey_hash" .= (show <$> toPubKeyHash creatorAddress)
+           , "writer_address_payment_script_hash" .= (show <$> toValidatorHash creatorAddress)
+           , "writer_address_staking_pubkey_hash" .= (show <$> toStakePubKeyHash creatorAddress)
+           , "writer_address_staking_script_hash" .= (show <$> toStakeValidatorHash creatorAddress)
+           , "premium_asset" .= toAsset premiumAsset
+           , "premium" .= premium
+           , "expiration_slot" .= getSlot (posixTimeToSlot expiration)
+           ]
+  toJSON ActiveContract{..} =
+    object [ "beacon_symbol" .= show beaconSymbol
+           , "current_asset" .= toAsset currentAsset
+           , "quantity" .= currentAssetQuantity
+           , "desired_asset" .= toAsset desiredAsset
+           , "strike_price" .= strikePrice
+           , "writer_address_payment_pubkey_hash" .= (show <$> toPubKeyHash creatorAddress)
+           , "writer_address_payment_script_hash" .= (show <$> toValidatorHash creatorAddress)
+           , "writer_address_staking_pubkey_hash" .= (show <$> toStakePubKeyHash creatorAddress)
+           , "writer_address_staking_script_hash" .= (show <$> toStakeValidatorHash creatorAddress)
+           , "premium_asset" .= toAsset premiumAsset
+           , "premium" .= premium
+           , "expiration_slot" .= getSlot (posixTimeToSlot expiration)
+           , "contract_id" .= idToString contractId
            ]

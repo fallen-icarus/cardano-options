@@ -862,6 +862,76 @@ burnRedeemerUsedToMint = do
       , proposeAsInline = True
       }
 
+batchedProposedBeaconsMintedToDappAddress :: EmulatorTrace ()
+batchedProposedBeaconsMintedToDappAddress = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let proposeDatum = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 10
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",2)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = addr
+      , proposeInfo = 
+          [ ( Just proposeDatum
+            , lovelaceValueOf 3_000_000 
+           <> singleton optionsBeaconPolicySym1 "Proposed" 2
+            )
+          ]
+      , proposeAsInline = True
+      }
+
+batchedProposedBeaconsMintedToWrongAddress :: EmulatorTrace ()
+batchedProposedBeaconsMintedToWrongAddress = do
+  h1 <- activateContractWallet (knownWallet 1) endpoints
+
+  let proposeDatum = ProposedContract
+        { beaconSymbol = optionsBeaconPolicySym1
+        , currentAsset = (adaSymbol,adaToken)
+        , currentAssetQuantity = 100_000_000
+        , desiredAsset = testToken1
+        , strikePrice = unsafeRatio 1 10
+        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , premiumAsset = (adaSymbol,adaToken)
+        , premium = 10_000_000
+        , expiration = slotToBeginPOSIXTime def 10
+        }
+      addr = Address (ScriptCredential optionsValidatorHash)
+                     (Just $ StakingHash
+                           $ PubKeyCredential
+                           $ unPaymentPubKeyHash
+                           $ mockWalletPaymentPubKeyHash
+                           $ knownWallet 1)
+  
+  callEndpoint @"propose-contract(s)" h1 $
+    ProposeParams
+      { proposeBeaconsMinted = [("Proposed",2)]
+      , proposeBeaconRedeemer = MintProposedBeacons
+      , proposeBeaconPolicy = optionsBeaconPolicy1
+      , proposeAddress = addr
+      , proposeInfo = 
+          []
+      , proposeAsInline = True
+      }
+
 -------------------------------------------------
 -- Test Function
 -------------------------------------------------
@@ -907,6 +977,10 @@ tests = do
         (Test.not assertNoFailedTransactions) singleContractNotStoredWithMinDeposit
     , checkPredicateOptions opts "Fail if at least one contract not stored with minimum deposit"
         (Test.not assertNoFailedTransactions) atLeastOneContractNotStoredWithMinDeposit
+    , checkPredicateOptions opts "Fail if proposed beacons are grouped into single UTxO at dApp address"
+        (Test.not assertNoFailedTransactions) batchedProposedBeaconsMintedToDappAddress
+    , checkPredicateOptions opts "Fail if proposed beacons are grouped into single UTxO at wrong address"
+        (Test.not assertNoFailedTransactions) batchedProposedBeaconsMintedToWrongAddress
 
     , checkPredicateOptions opts "Successfully propose sinlge contract"
         assertNoFailedTransactions successfullyProposeSingleContract
@@ -918,4 +992,4 @@ tests = do
     ]
 
 testTrace :: IO ()
-testTrace = runEmulatorTraceIO' def emConfig burnRedeemerUsedToMint
+testTrace = runEmulatorTraceIO' def emConfig batchedProposedBeaconsMintedToDappAddress

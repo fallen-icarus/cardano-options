@@ -46,6 +46,12 @@ module CardanoOptions
   getPubKeyHash,
   getValidatorHash,
   unsafeFromRight,
+  toAsset,
+  idToString,
+  toStakePubKeyHash,
+  toStakeValidatorHash,
+  toValidatorHash,
+  toPubKeyHash,
 
   optionsValidator,
   optionsValidatorScript,
@@ -737,7 +743,7 @@ mkOptionsBeaconPolicy OptionsConfig{..} appName valHash r ctx@ScriptContext{scri
                                              }
                  } =
             -- | Check if the output contains the Active beacon.
-            if valueOf oVal beaconSym (TokenName "Active") == 1 then
+            if valueOf oVal beaconSym (TokenName "Active") > 0 then
               -- | Check that the Active beacon is stored at the proper address.
               if addrCred == ScriptCredential valHash && 
                  maybeStakeCred == Just (StakingHash stakingCred) then
@@ -781,7 +787,7 @@ mkOptionsBeaconPolicy OptionsConfig{..} appName valHash r ctx@ScriptContext{scri
                        } =
             case r of
               MintAssetsBeacon ->
-                if valueOf oVal beaconSym (TokenName "Assets") == 1 then
+                if valueOf oVal beaconSym (TokenName "Assets") > 0 then
                   let datum = parseOptionsDatum d
                   in case (addrCred,maybeStakeCred) of
                     (ScriptCredential vh, Just (StakingHash _)) -> 
@@ -790,7 +796,7 @@ mkOptionsBeaconPolicy OptionsConfig{..} appName valHash r ctx@ScriptContext{scri
                     _ -> traceError "Asset beacon must go to a dApp address with a staking credential"
                 else acc
               MintProposedBeacons ->
-                if valueOf oVal beaconSym (TokenName "Proposed") == 1 then
+                if valueOf oVal beaconSym (TokenName "Proposed") > 0 then
                   let datum = parseOptionsDatum d
                   in case (addrCred,maybeStakeCred) of
                     (ScriptCredential vh, Just (StakingHash _)) -> 
@@ -904,7 +910,7 @@ unsafeFromRight (Right x) = x
 unsafeFromRight _ = Haskell.error "unsafeFromRight used on Left"
 
 -------------------------------------------------
--- ToJSON Instances and Helper Functions
+-- ToJSON Helper Functions
 -------------------------------------------------
 toEncodedText :: TokenName -> Text
 toEncodedText (TokenName (BuiltinByteString tn)) = encodeByteString tn
@@ -924,40 +930,3 @@ toStakePubKeyHash _ = Nothing
 toStakeValidatorHash :: Address -> Maybe ValidatorHash
 toStakeValidatorHash (Address _ (Just (StakingHash (ScriptCredential vh)))) = Just vh
 toStakeValidatorHash _ = Nothing
-
-instance ToJSON OptionsDatum where
-  toJSON AssetsForContract{..} =
-    object [ "beacon_symbol" .= Haskell.show beaconSymbol
-           , "current_asset" .= toAsset currentAsset
-           , "quantity" .= currentAssetQuantity
-           , "desired_asset" .= toAsset desiredAsset
-           ]
-  toJSON ProposedContract{..} =
-    object [ "beacon_symbol" .= Haskell.show beaconSymbol
-           , "current_asset" .= toAsset currentAsset
-           , "quantity" .= currentAssetQuantity
-           , "desired_asset" .= toAsset desiredAsset
-           , "strike_price" .= strikePrice
-           , "writer_address_payment_pubkey_hash" .= (Haskell.show <$> toPubKeyHash creatorAddress)
-           , "writer_address_payment_script_hash" .= (Haskell.show <$> toValidatorHash creatorAddress)
-           , "writer_address_staking_pubkey_hash" .= (Haskell.show <$> toStakePubKeyHash creatorAddress)
-           , "writer_address_staking_script_hash" .= (Haskell.show <$> toStakeValidatorHash creatorAddress)
-           , "premium_asset" .= toAsset premiumAsset
-           , "premium" .= premium
-           , "expiration_slot" .= getSlot (posixTimeToSlot expiration)
-           ]
-  toJSON ActiveContract{..} =
-    object [ "beacon_symbol" .= Haskell.show beaconSymbol
-           , "current_asset" .= toAsset currentAsset
-           , "quantity" .= currentAssetQuantity
-           , "desired_asset" .= toAsset desiredAsset
-           , "strike_price" .= strikePrice
-           , "writer_address_payment_pubkey_hash" .= (Haskell.show <$> toPubKeyHash creatorAddress)
-           , "writer_address_payment_script_hash" .= (Haskell.show <$> toValidatorHash creatorAddress)
-           , "writer_address_staking_pubkey_hash" .= (Haskell.show <$> toStakePubKeyHash creatorAddress)
-           , "writer_address_staking_script_hash" .= (Haskell.show <$> toStakeValidatorHash creatorAddress)
-           , "premium_asset" .= toAsset premiumAsset
-           , "premium" .= premium
-           , "expiration_slot" .= getSlot (posixTimeToSlot expiration)
-           , "contract_id" .= idToString contractId
-           ]

@@ -26,7 +26,7 @@ import Plutus.Trace
 import Wallet.Emulator.Wallet
 import Plutus.Contract.Test as Test
 import Test.Tasty
-import Ledger.Ada (lovelaceValueOf)
+import Plutus.Script.Utils.Ada (lovelaceValueOf)
 import Data.Default
 import Plutus.V2.Ledger.Api
 import Ledger.Address

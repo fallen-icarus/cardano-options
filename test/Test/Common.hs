@@ -23,25 +23,30 @@ import Control.Lens hiding (from,index,to)
 import Data.Default
 import Data.Void (Void)
 import Control.Monad (void)
-import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 import Data.Text (Text)
-import Ledger hiding (singleton,mintingPolicyHash)
-import Ledger.Constraints as Constraints
-import qualified Ledger.Constraints.TxConstraints as Constraints
+import Ledger hiding (singleton,mintingPolicyHash,Value,lovelaceValueOf,from)
+import Ledger.Tx.Constraints as Constraints
+import qualified Ledger.Tx.Constraints.TxConstraints as Constraints
+import Ledger.Tx.Constraints.TxConstraints (TxOutDatum(..))
 import Plutus.Contract
 import qualified PlutusTx
 import PlutusTx.Prelude hiding (Semigroup (..), foldMap)
-import Ledger.Value (singleton)
-import Ledger.Ada (lovelaceValueOf)
+import Plutus.Script.Utils.Value (singleton,Value)
+import Plutus.Script.Utils.Ada (lovelaceValueOf)
 import Plutus.Script.Utils.V2.Scripts as UScripts
 import Plutus.Trace
 import Wallet.Emulator.Wallet
 import Data.List (foldl',repeat)
 import Prelude as Haskell (Semigroup (..), String)
-import Cardano.Api.Shelley (ExecutionUnits (..),ProtocolParameters (..))
+import Cardano.Api.Shelley (ProtocolParameters (..))
 import Ledger.Tx.Internal as I
 import Plutus.Script.Utils.V2.Generators (alwaysSucceedPolicy)
+import qualified Cardano.Api as C
+import Cardano.Api hiding (TxOutDatum(..),TxOutDatumInline,TxOutDatumHash,Address,TxId,Value)
+import Cardano.Node.Emulator.Params
+import Ledger.Tx.CardanoAPI.Internal
+import Ledger.Tx.Constraints.ValidityInterval
 
 import CardanoOptions
 
@@ -53,7 +58,7 @@ txIdWithValue value' = do
   state <- chainState
   let xs = Map.toList $ getIndex (state ^. index)
       findTxId v ((TxOutRef txId' _,o):ys)
-        | I.txOutValue o == v = txId'
+        | fromCardanoValue (I.txOutValue o) == v = txId'
         | otherwise = findTxId v ys
   return $ findTxId value' xs
 
@@ -204,52 +209,52 @@ optionsBeaconPolicySym4 = UScripts.scriptCurrencySymbol optionsBeaconPolicy4
 emConfig :: EmulatorConfig
 emConfig = EmulatorConfig (Left $ Map.fromList wallets) def
   where
-    user1 :: Value
-    user1 = lovelaceValueOf 1_000_000_000
+    user1 :: C.Value
+    user1 = unsafeFromRight . toCardanoValue $ lovelaceValueOf 1_000_000_000
          <> (uncurry singleton testToken1) 1000
          <> (uncurry singleton testToken2) 1000
          <> (uncurry singleton testToken3) 1000
          <> (uncurry singleton testToken4) 1000
 
-    user2 :: Value
-    user2 = lovelaceValueOf 1_000_000_000
+    user2 :: C.Value
+    user2 = unsafeFromRight . toCardanoValue $ lovelaceValueOf 1_000_000_000
          <> (uncurry singleton testToken1) 1000
          <> (uncurry singleton testToken2) 1000
          <> (uncurry singleton testToken3) 1000
          <> (uncurry singleton testToken4) 1000
          <> singleton optionsBeaconPolicySym1 "Assets" 5
     
-    user3 :: Value
-    user3 = lovelaceValueOf 1_000_000_000
+    user3 :: C.Value
+    user3 = unsafeFromRight . toCardanoValue $ lovelaceValueOf 1_000_000_000
          <> (uncurry singleton testToken1) 1000
          <> (uncurry singleton testToken2) 1000
          <> (uncurry singleton testToken3) 1000
          <> (uncurry singleton testToken4) 1000
          <> singleton optionsBeaconPolicySym1 "Proposed" 5
     
-    user4 :: Value
-    user4 = lovelaceValueOf 1_000_000_000
+    user4 :: C.Value
+    user4 = unsafeFromRight . toCardanoValue $ lovelaceValueOf 1_000_000_000
          <> (uncurry singleton testToken1) 1000
          <> (uncurry singleton testToken2) 1000
          <> (uncurry singleton testToken3) 1000
          <> (uncurry singleton testToken4) 1000
          <> singleton optionsBeaconPolicySym1 "Active" 5
     
-    user5 :: Value
-    user5 = lovelaceValueOf 1_000_000_000
+    user5 :: C.Value
+    user5 = unsafeFromRight . toCardanoValue $ lovelaceValueOf 1_000_000_000
          <> (uncurry singleton testToken1) 1000
          <> (uncurry singleton testToken2) 1000
          <> (uncurry singleton testToken3) 1000
          <> (uncurry singleton testToken4) 1000
 
-    user6 :: Value
-    user6 = lovelaceValueOf 1_000_000_000
+    user6 :: C.Value
+    user6 = unsafeFromRight . toCardanoValue $ lovelaceValueOf 1_000_000_000
          <> (uncurry singleton testToken1) 1000
          <> (uncurry singleton testToken2) 1000
          <> (uncurry singleton testToken3) 1000
          <> (uncurry singleton testToken4) 1000
   
-    wallets :: [(Wallet,Value)]
+    wallets :: [(Wallet,C.Value)]
     wallets = 
       [ (knownWallet 1, user1)
       , (knownWallet 2, user2)
@@ -359,7 +364,7 @@ proposeContracts ProposeParams{..} = do
 closeAssetsUTxO :: CloseAssetsParams -> Contract () TraceSchema Text ()
 closeAssetsUTxO CloseAssetsParams{..} = do
   userPubKeyHash <- ownFirstPaymentPubKeyHash
-  assetsUtxos <- utxosAt closeAssetsOptionsAddress
+  assetsUtxos <- utxosAt $ unsafeFromRight $ toCardanoAddressInEra Mainnet closeAssetsOptionsAddress
 
   let beaconPolicyHashes = map mintingPolicyHash closeAssetsBeaconPolicies
       beaconRedeemer = toRedeemer closeAssetsBeaconRedeemer
@@ -404,7 +409,7 @@ closeAssetsUTxO CloseAssetsParams{..} = do
 closeProposalUTxO :: CloseProposalParams -> Contract () TraceSchema Text ()
 closeProposalUTxO CloseProposalParams{..} = do
   userPubKeyHash <- ownFirstPaymentPubKeyHash
-  proposalUtxos <- utxosAt closeProposalOptionsAddress
+  proposalUtxos <- utxosAt $ unsafeFromRight $ toCardanoAddressInEra Mainnet closeProposalOptionsAddress
 
   let beaconPolicyHashes = map mintingPolicyHash closeProposalBeaconPolicies
       beaconRedeemer = toRedeemer closeProposalBeaconRedeemer
@@ -448,7 +453,8 @@ closeProposalUTxO CloseProposalParams{..} = do
 
 multiAcceptContracts :: MultiAcceptParams -> Contract () TraceSchema Text ()
 multiAcceptContracts MultiAcceptParams{..} = do
-  offerUtxos <- Map.unions <$> mapM utxosAt multiAcceptOptionsAddresses
+  offerUtxos <- Map.unions 
+            <$> mapM (utxosAt . unsafeFromRight . toCardanoAddressInEra Mainnet) multiAcceptOptionsAddresses
   (start,_) <- currentNodeClientTimeRange
   userPubKeyHash <- ownFirstPaymentPubKeyHash
 
@@ -508,7 +514,7 @@ multiAcceptContracts MultiAcceptParams{..} = do
            )
         -- | Must tell script current time
         <> (if multiAcceptWithTTL
-            then mustValidateIn (from start)
+            then mustValidateInTimeRange (from start)
             else mempty)
         -- | Must be signed by borrower
         <> mustBeSignedBy userPubKeyHash
@@ -519,7 +525,8 @@ multiAcceptContracts MultiAcceptParams{..} = do
 
 executeContract :: ExecuteParams -> Contract () TraceSchema Text ()
 executeContract ExecuteParams{..} = do
-  contractUTxOs <- Map.unions <$> mapM utxosAt executeAddresses
+  contractUTxOs <- Map.unions 
+               <$> mapM (utxosAt . unsafeFromRight . toCardanoAddressInEra Mainnet) executeAddresses
   (_,end) <- currentNodeClientTimeRange
   userPubKeyHash <- ownFirstPaymentPubKeyHash
 
@@ -573,7 +580,8 @@ executeContract ExecuteParams{..} = do
            )
         -- | Must tell script current time
         <> (if executeWithTTE
-            then mustValidateIn (to end)
+            then mustValidateInTimeRange (lessThan $ 1 + end) 
+                   -- ^ This is needed since the upper bound is exclusive.
             else mempty)
         -- | Must be signed by borrower
         <> mustBeSignedBy userPubKeyHash
@@ -584,7 +592,7 @@ executeContract ExecuteParams{..} = do
 
 claim :: ClaimParams -> Contract () TraceSchema Text ()
 claim ClaimParams{..} = do
-  contractUTxOs <- utxosAt claimAddress
+  contractUTxOs <- utxosAt $ unsafeFromRight $ toCardanoAddressInEra Mainnet claimAddress
   (start,_) <- currentNodeClientTimeRange
   userPubKeyHash <- ownFirstPaymentPubKeyHash
 
@@ -617,7 +625,7 @@ claim ClaimParams{..} = do
                   claimSpecificUTxOs
         -- | Must tell script current time
         <> (if claimWithTTL
-            then mustValidateIn (from start)
+            then mustValidateInTimeRange (from start)
             else mempty)
         -- | Must be signed by borrower
         <> mustBeSignedBy userPubKeyHash

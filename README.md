@@ -17,6 +17,7 @@ purchase an option contract = 1.111633 ADA
 close an expired contract UTxO = 0.826764 ADA
 burn expired contractID = 0.553654 ADA
 execute contract = 1.033613 ADA
+update address = 0.575059 ADA
 
 ## Example Query Responses
 

@@ -74,7 +74,7 @@ cardano-cli query protocol-parameters \
   --out-file "${tmpDir}protocol.json"
 
 cardano-cli transaction build \
-  --tx-in fd0bbef32859abf1d61c71d54c6b2416ad664e2c978581e4df50fc2f795b2e20#3 \
+  --tx-in 2fa45e5d847911809ff557e39fd063ddeeace5a8489a44fb7156b65fa41168af#1 \
   --tx-out "$(cat ${optionsAddrFile}) + 15000000 lovelace + 1 ${assetsBeacon}" \
   --tx-out-inline-datum-file $assetsDatumFile \
   --mint "1 ${assetsBeacon}" \

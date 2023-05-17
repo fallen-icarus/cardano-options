@@ -10,7 +10,7 @@ beaconPolicyFile="${dir}beacons.plutus"
 
 beaconRedeemerFile="${dir}burnBeacons.json"
 
-contractId="3c4d40a176b599ecb82d45a80795bb8219e1dcd4d84e0dde64f46ff872f7d52f"
+contractId="eda1ae16877891c958f5ca2de23867cbf03ca6d72c48586468ccd536deb26b3e"
 
 ## Export the beacon policy for that trading pair.
 echo "Exporting the beacon policy script..."
@@ -39,8 +39,7 @@ cardano-cli query protocol-parameters \
   --out-file "${tmpDir}protocol.json"
 
 cardano-cli transaction build \
-  --tx-in 96024fb9e9f3aa5112b2eb985aa71658225e3e3e9a4f66509e4a062ec6e481e8#3 \
-  --tx-in 1c2798410ce33f1d6efc473d9a4971bc002a2846681255d8fd2e04d61d7e54aa#0 \
+  --tx-in 996a030783d8fe22d8698e56ccccec43e0ac45662b6cbfddb834914dc0bf07d9#0 \
   --tx-out "$(cat ../assets/wallets/01.addr) + 2000000 lovelace + 10 c0f8644a01a6bf5db02f4afe30d604975e63dd274f1098a1738e561d.4f74686572546f6b656e0a" \
   --mint "-1 ${contractIDBeacon}" \
   --mint-script-file $beaconPolicyFile \

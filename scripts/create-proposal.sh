@@ -20,7 +20,7 @@ proposedTokenName="50726f706f736564" # This is the hexidecimal encoding for 'Pro
 
 writerStakingPubKeyFile="../assets/wallets/01Stake.vkey"
 
-slotTip=27970454
+slotTip=28650789
 
 ## Generate the hash for the staking verification key.
 echo "Calculating the staking pubkey hash for the writer..."
@@ -98,7 +98,7 @@ cardano-cli query protocol-parameters \
   --out-file "${tmpDir}protocol.json"
 
 cardano-cli transaction build \
-  --tx-in 3c4d40a176b599ecb82d45a80795bb8219e1dcd4d84e0dde64f46ff872f7d52f#1 \
+  --tx-in 4f7a9f56810532dbcb421cb1c9601806dae5bc4a07eea1e6869ed4db7e70a51e#3 \
   --tx-out "$(cat ${optionsAddrFile}) + 3000000 lovelace + 1 ${proposedBeacon}" \
   --tx-out-inline-datum-file $proposalDatumFile1 \
   --tx-out "$(cat ${optionsAddrFile}) + 3000000 lovelace + 1 ${proposedBeacon}" \

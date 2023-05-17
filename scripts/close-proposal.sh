@@ -46,8 +46,7 @@ cardano-options beacon-redeemer burn-beacons \
 
 ## Create the spending redeemer.
 echo "Creating the spending redeemer..."
-cardano-options options-redeemer \
-  --close-proposal \
+cardano-options options-redeemer close-proposal \
   --out-file $spendingRedeemerFile
 
 ## Helper Proposed beacon variable
@@ -59,11 +58,11 @@ cardano-cli query protocol-parameters \
   --out-file "${tmpDir}protocol.json"
 
 cardano-cli transaction build \
-  --tx-in 96024fb9e9f3aa5112b2eb985aa71658225e3e3e9a4f66509e4a062ec6e481e8#2 \
+  --tx-in 04bdd49521adb7b313e4eb3588169e883f91f82a1f8f3bccaefdb48d647baa3f#1 \
   --tx-in-script-file $optionsScriptFile \
   --tx-in-inline-datum-present \
   --tx-in-redeemer-file $spendingRedeemerFile \
-  --tx-in 96024fb9e9f3aa5112b2eb985aa71658225e3e3e9a4f66509e4a062ec6e481e8#1 \
+  --tx-in 04bdd49521adb7b313e4eb3588169e883f91f82a1f8f3bccaefdb48d647baa3f#2 \
   --tx-in-script-file $optionsScriptFile \
   --tx-in-inline-datum-present \
   --tx-in-redeemer-file $spendingRedeemerFile \

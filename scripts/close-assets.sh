@@ -46,8 +46,7 @@ cardano-options beacon-redeemer burn-beacons \
 
 ## Create the spending redeemer.
 echo "Creating the spending redeemer..."
-cardano-options options-redeemer \
-  --close-assets \
+cardano-options options-redeemer close-assets \
   --out-file $spendingRedeemerFile
 
 ## Helper Assets beacon variable

@@ -52,8 +52,7 @@ cardano-options beacon-redeemer burn-beacons \
 
 ## Create the spending redeemer.
 echo "Creating the spending redeemer..."
-cardano-options options-redeemer \
-  --close-expired-contract \
+cardano-options options-redeemer close-expired-contract \
   --out-file $spendingRedeemerFile
 
 ## Helper beacon variables

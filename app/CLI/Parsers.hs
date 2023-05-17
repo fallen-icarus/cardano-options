@@ -6,7 +6,7 @@ module CLI.Parsers
 ) where
 
 import Options.Applicative
-import Data.Text (Text,pack)
+import Data.Text (pack)
 
 import CardanoOptions
 import CLI.Types
@@ -24,12 +24,10 @@ parseCommand = hsubparser $ mconcat
       (info pCreateOptionsRedeemer $ progDesc "Create a redeemer for the options validator.")
   , command "beacon-redeemer"
       (info parseCreateBeaconRedeemer $ progDesc "Create a redeemer for the beacon policy.")
-  , command "address-hashes"
-      (info pExtractAddressInfo $ progDesc "Extract hashes from a bech32 address.")
-  , command "generate-bech32-address"
-      (info pGenerateBech32Address $ progDesc "Generate a bech32 address from hashes.")
-  , command "convert"
-      (info pConvert $ progDesc "Convert POSIXTime <--> Slot.")
+  , command "convert-address"
+      (info pConvertAddress $ progDesc "Convert plutus address <--> Bech32 address.")
+  , command "convert-time"
+      (info pConvertTime $ progDesc "Convert POSIXTime <--> Slot.")
   , command "query"
       (info parseQueryBeacons $ progDesc "Query the dApp's beacons.")
   ]
@@ -63,8 +61,8 @@ parseCreateOptionsDatum = hsubparser $ mconcat
         (info pAssets $ progDesc "Create the datum for creating an Assets UTxO to back a contract.")
     , command "proposal-datum"
         (info pProposal $ progDesc "Create the datum for proposing a contract.")
-    , command "accept-datum"
-        (info pAccept $ progDesc "Create the datum for accepting a contract.")
+    , command "active-datum"
+        (info pAccept $ progDesc "Create the datum for accepting/updating a contract.")
     ]
   where
     pAssets :: Parser Command
@@ -80,40 +78,41 @@ parseCreateOptionsDatum = hsubparser $ mconcat
 -- CreateOptionsRedeemer Parsers
 -------------------------------------------------
 pCreateOptionsRedeemer :: Parser Command
-pCreateOptionsRedeemer =
-    CreateOptionsRedeemer
-      <$> (pCloseAssets <|> pCloseProposed <|> pAcceptContract <|> pExecuteContract <|> pCloseExpired)
-      <*> pOutputFile
+pCreateOptionsRedeemer = hsubparser $ mconcat
+    [ command "close-assets"
+        (info pCloseAssets $ progDesc "Close an Assets UTxO.")
+    , command "close-proposal"
+        (info pCloseProposed $ progDesc "Close Proposal UTxO(s).")
+    , command "purchase-contract"
+        (info pAcceptContract $ progDesc "Purchase an options contract.")
+    , command "execute-contract"
+        (info pExecuteContract $ progDesc "Execute an options contract.")
+    , command "close-expired-contract"
+        (info pCloseExpired $ progDesc "Close and expired contract UTxO.")
+    , command "update-address"
+        (info pUpdateAddress $ progDesc "Update an ActiveDatum's address")
+    ]
   where
-    pCloseAssets :: Parser OptionsRedeemer
-    pCloseAssets = flag' CloseAssets
-      (  long "close-assets"
-      <> help "Close an Assets UTxO."
-      )
+    pCloseAssets :: Parser Command
+    pCloseAssets = CreateOptionsRedeemer CloseAssets <$> pOutputFile
 
-    pCloseProposed :: Parser OptionsRedeemer
-    pCloseProposed = flag' CloseProposedContracts
-      (  long "close-proposal"
-      <> help "Close a Proposal UTxO."
-      )
+    pCloseProposed :: Parser Command
+    pCloseProposed = CreateOptionsRedeemer CloseProposedContracts <$> pOutputFile
 
-    pAcceptContract :: Parser OptionsRedeemer
-    pAcceptContract = flag' AcceptContract
-      (  long "purchase-contract"
-      <> help "Purchase an options contract."
-      )
+    pAcceptContract :: Parser Command
+    pAcceptContract = CreateOptionsRedeemer AcceptContract <$> pOutputFile
 
-    pExecuteContract :: Parser OptionsRedeemer
-    pExecuteContract = flag' ExecuteContract
-      (  long "execute-contract"
-      <> help "Execute an options contract."
-      )
+    pExecuteContract :: Parser Command
+    pExecuteContract = CreateOptionsRedeemer ExecuteContract <$> pOutputFile
 
-    pCloseExpired :: Parser OptionsRedeemer
-    pCloseExpired = flag' CloseExpiredContract
-      (  long "close-expired-contract"
-      <> help "Close an expired contract UTxO."
-      )
+    pCloseExpired :: Parser Command
+    pCloseExpired = CreateOptionsRedeemer CloseExpiredContract <$> pOutputFile
+
+    pUpdateAddress :: Parser Command
+    pUpdateAddress = 
+      CreateOptionsRedeemer 
+        <$> (UpdateAddress <$> pAddress)
+        <*> pOutputFile
 
 -------------------------------------------------
 -- CreateBeaconRedeemer Parser
@@ -164,39 +163,37 @@ parseCreateBeaconRedeemer = hsubparser $ mconcat
     pCredential = pPubKeyCredential <|> pScriptCredential
 
 -------------------------------------------------
--- ExtractAddressHashes Parser
+-- ConvertTime Parser
 -------------------------------------------------
-pExtractAddressInfo :: Parser Command
-pExtractAddressInfo = ExtractAddressHashes <$> pBechAddr <*> pOutput
+pConvertTime :: Parser Command
+pConvertTime = ConvertTime <$> (pPOSIXTime <|> pSlot)
   where
-    pBechAddr :: Parser Text
-    pBechAddr = pack <$> pBech32Address
-
--------------------------------------------------
--- GenerateBech32Address Parser
--------------------------------------------------
-pGenerateBech32Address :: Parser Command
-pGenerateBech32Address = GenerateBech32Address <$> pAddress <*> pOutput
-
--------------------------------------------------
--- Convert Parser
--------------------------------------------------
-pConvert :: Parser Command
-pConvert = Convert <$> (pPOSIXTime <|> pSlot)
-  where
-    pPOSIXTime :: Parser Convert
+    pPOSIXTime :: Parser ConvertTime
     pPOSIXTime = POSIXTimeToSlot . POSIXTime <$> option auto
       (  long "posix-time"
       <> metavar "INT"
       <> help "Convert POSIX time to slot number."
       )
 
-    pSlot :: Parser Convert
+    pSlot :: Parser ConvertTime
     pSlot = SlotToPOSIXTime . Slot <$> option auto
       (  long "slot"
       <> metavar "INT"
       <> help "Convert slot number to POSIX time."
       )
+
+-------------------------------------------------
+-- ConvertAddress Parser
+-------------------------------------------------
+pConvertAddress :: Parser Command
+pConvertAddress = 
+    ConvertAddress <$> (pBech <|> pPlutus) <*> pOutput
+  where
+    pBech :: Parser ConvertAddress
+    pBech = Bech32 . pack <$> pBech32Address
+
+    pPlutus :: Parser ConvertAddress
+    pPlutus = Plutus <$> pAddress
 
 -------------------------------------------------
 -- QueryBeacons Parser

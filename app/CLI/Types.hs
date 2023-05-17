@@ -17,9 +17,8 @@ data Command
   | CreateOptionsDatum OptionsDatum FilePath
   | CreateOptionsRedeemer OptionsRedeemer FilePath
   | CreateBeaconRedeemer OptionsBeaconRedeemer FilePath
-  | ExtractAddressHashes Text Output
-  | GenerateBech32Address Address Output
-  | Convert Convert
+  | ConvertTime ConvertTime
+  | ConvertAddress ConvertAddress Output
   | QueryBeacons Query
 
 data Query
@@ -30,9 +29,13 @@ data Query
   | QuerySpecificContract Network CurrencySymbol TokenName Output
   | QueryOwnContracts Network CurrencySymbol OptionsAddress Output
 
-data Convert
+data ConvertTime
   = POSIXTimeToSlot POSIXTime
   | SlotToPOSIXTime Slot
+
+data ConvertAddress
+  = Plutus Address
+  | Bech32 Text
 
 data Script = BeaconPolicy OptionsConfig | OptionsScript
 

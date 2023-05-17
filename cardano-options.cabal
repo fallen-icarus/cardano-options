@@ -62,6 +62,7 @@ test-suite cardano-options-tests
     , Test.CreateAssetsUTxO
     , Test.ExecuteContract
     , Test.ProposeContracts
+    , Test.UpdateAddress
   build-depends:
     cardano-options,
     plutus-contract,

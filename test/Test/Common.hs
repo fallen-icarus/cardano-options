@@ -157,6 +157,16 @@ data ClaimParams = ClaimParams
   , claimWithTTL :: Bool
   } deriving (Generic,ToJSON,FromJSON)
 
+data AddressUpdateParams = AddressUpdateParams
+  { updateAddressOptionsVal :: Validator
+  , updateAddressOptionsAddress :: Address
+  , updateAddressSpecificUTxOs :: [(OptionsDatum,Value)]
+  , updateAddressRedeemer :: OptionsRedeemer
+  , updateAddressChangeAddress :: Address
+  , updateAddressChange :: [(Maybe OptionsDatum,Value)]
+  , updateAddressAsInline :: Bool
+  } deriving (Generic,ToJSON,FromJSON)
+
 type TraceSchema =
       Endpoint "create-assets-utxo" AssetsParams
   .\/ Endpoint "propose-contract(s)" ProposeParams
@@ -165,6 +175,7 @@ type TraceSchema =
   .\/ Endpoint "accept-contract(s)" MultiAcceptParams
   .\/ Endpoint "execute-contract(s)" ExecuteParams
   .\/ Endpoint "close-expired-contract(s)" ClaimParams
+  .\/ Endpoint "update-address" AddressUpdateParams
 
 -------------------------------------------------
 -- Configs
@@ -291,7 +302,7 @@ lenientConfig = emConfig & params .~ params'
     protoParams :: ProtocolParameters
     protoParams = def{ protocolParamMaxTxExUnits = Just (ExecutionUnits {executionSteps = 10000000000
                                                                         ,executionMemory = 14000000})
-                     , protocolParamMaxTxSize = 21300
+                     , protocolParamMaxTxSize = 23300
                      }
 
 -------------------------------------------------
@@ -634,6 +645,43 @@ claim ClaimParams{..} = do
   void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
   logInfo @String "Claimed an expired contract"
 
+addressUpdate :: AddressUpdateParams -> Contract () TraceSchema Text ()
+addressUpdate AddressUpdateParams{..} = do
+  userPubKeyHash <- ownFirstPaymentPubKeyHash
+  activeUTxOs <- utxosAt $ unsafeFromRight $ toCardanoAddressInEra Mainnet updateAddressOptionsAddress
+  let toDatum'
+        | updateAddressAsInline = TxOutDatumInline . toDatum
+        | otherwise = TxOutDatumHash . toDatum
+
+      updateRedeemer = toRedeemer updateAddressRedeemer
+      
+      lookups = plutusV2OtherScript updateAddressOptionsVal
+             <> Constraints.unspentOutputs activeUTxOs
+      
+      tx' =
+        -- | Must spend all utxos to be updated
+        foldl' (\a (d,v) -> 
+                    a <>
+                    mustSpendScriptOutputWithMatchingDatumAndValue 
+                      (UScripts.validatorHash updateAddressOptionsVal) 
+                      (== toDatum d)
+                      (==v) 
+                      updateRedeemer
+                ) 
+                mempty 
+                updateAddressSpecificUTxOs
+        -- | Return change to options address
+        <> foldl'
+              (\acc (d,v) -> acc <> mustPayToAddressWith updateAddressChangeAddress (fmap toDatum' d) v)
+              mempty
+              updateAddressChange
+        -- | Must be signed by address staking pubkey
+        <> mustBeSignedBy userPubKeyHash
+  
+  ledgerTx <- submitTxConstraintsWith @Void lookups tx'
+  void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
+  logInfo @String "Address updated"
+
 -------------------------------------------------
 -- Endpoints
 -------------------------------------------------
@@ -647,6 +695,7 @@ endpoints = selectList choices >> endpoints
     multiAcceptContracts' = endpoint @"accept-contract(s)" multiAcceptContracts
     executeContract' = endpoint @"execute-contract(s)" executeContract
     claim' = endpoint @"close-expired-contract(s)" claim
+    addressUpdate' = endpoint @"update-address" addressUpdate
     choices = 
       [ createAssetsUTxO'
       , proposeContracts'
@@ -655,4 +704,5 @@ endpoints = selectList choices >> endpoints
       , multiAcceptContracts'
       , executeContract'
       , claim'
+      , addressUpdate'
       ]

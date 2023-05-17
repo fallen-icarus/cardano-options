@@ -163,6 +163,8 @@ data OptionsRedeemer
   | AcceptContract
   | ExecuteContract
   | CloseExpiredContract -- ^ Reclaim assets after a contract expires without being executed.
+  | UpdateAddress Address
+      -- ^ Allows the contract creator to change the creatorAddress in an active contract.
   deriving (Haskell.Show,Generic)
 
 data OptionsBeaconRedeemer
@@ -433,6 +435,19 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} =
       else True
       -- Note: This redeemer can be used to close ActiveContract UTxOs that are missing
       -- the Active beacon.
+    UpdateAddress newAddress ->
+      -- | The Active beacon must be present in the UTxO. This implies the UTxO is an active
+      -- contract with an ActiveDatum.
+      traceIfFalse "Active beacon is missing from UTxO"
+        (valueOf inputValue (beaconSymbol optionsDatum) (TokenName "Active") == 1) &&
+      -- | The new address must use a payment pubkey.
+      traceIfFalse "New address does not use payment pubkey" (isPaymentPubKeyCred newAddress) &&
+      -- | The new UTxO must be re-output to this address with:
+      --     1) The exact same value as the input.
+      --     2) The exact same datum except for the new address for the creatorAddress.
+      traceIfFalse "New active contract output not found" (addressOutputCheck newAddress) &&
+      -- | The staking credential must signal approval.
+      traceIfFalse "Staking credential did not approve" stakingCredApproves'
         
   where
     -- | Get the credential for this input as well as its value.
@@ -511,6 +526,31 @@ mkOptionsValidator optionsDatum r ctx@ScriptContext{scriptContextTxInfo=info} =
                 )
             else acc -- ^ Skip input.
       in foldl' (foo creatorAddr desired due receiptToken) False outputs
+
+    -- | This will only return False if no output to this address is found.
+    -- All other scenarios will either result in an error or True. This does not
+    -- allow composing address updates since the input value will be compared againts every
+    -- output to this address. This can only return True is the value matches EVERY output to this
+    -- address which is not possible due to the ContractID token; the input can only ever match one
+    -- output.
+    addressOutputCheck :: Address -> Bool
+    addressOutputCheck newAddress =
+      let outputs = txInfoOutputs info
+          foo newAddr oldDatum iCred iVal acc TxOut{txOutValue = oVal
+                                                   ,txOutDatum = d
+                                                   ,txOutAddress = addr
+                                                   } =
+            -- | Check if this output is to this address.
+            if addr == iCred then
+              -- | Check if the value has changed.
+              if oVal == iVal then
+                let datum = parseOptionsDatum d
+                in if datum == oldDatum{creatorAddress = newAddr}
+                   then True
+                   else traceError "Incorrect UTxO datum"
+              else traceError "UTxO value changed"
+            else acc -- ^ Skip output.
+      in foldl' (foo newAddress optionsDatum inputCredentials inputValue) False outputs
 
 data Options
 instance ValidatorTypes Options where

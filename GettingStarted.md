@@ -174,18 +174,18 @@ An always succeeding minting policy as well as the required redeemer are include
 ---
 ## Convert POSIX time <--> Slot
 ``` Bash
-cardano-loans convert --slot 26668590
+cardano-loans convert-time --slot 26668590
 
-cardano-loans convert --posix-time 1682351790000
+cardano-loans convert-time --posix-time 1682351790000
 ```
 
 ---
 ## Address Conversions
 Since plutus smart contracts do not use bech32 encoded address while cardano-cli does, addresses will need to be converted as necessary. To make this as painless as possible, `cardano-options` is capable of doing these conversions for you. It uses `cardano-addresses` under the hood.
 
-### Hashes to Bech32
+### Plutus Hashes to Bech32
 ``` Bash
-cardano-options generate-bech32-address \
+cardano-options convert-address \
   --payment-pubkey-hash ae0d001455a855e6c00f98fa9061028f5c00d297926383bc501be2d2 \
   --staking-pubkey-hash 623a2b9a369454b382c131d7e3d12c4f93024022e5c5668cf0c5c25c \
   --stdout
@@ -193,9 +193,9 @@ cardano-options generate-bech32-address \
 
 All bech32 addresses generated with this command will be for the preproduction testnet.
 
-### Bech32 to Hashes
+### Bech32 to Plutus Hashes
 ``` Bash
-cardano-options address-hashes \
+cardano-options convert-address \
   --address addr_test1vrlfp27zjnjlsak5f7dnjkpl9ekeq5ezc3e4uw769y5rgtc4qvv2f \
   --stdout
 ```

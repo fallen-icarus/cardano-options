@@ -31,7 +31,6 @@ import Plutus.Script.Utils.Ada (lovelaceValueOf)
 import Data.Default
 import Plutus.V2.Ledger.Api
 import Ledger.Address
-import Plutus.Script.Utils.V2.Generators (alwaysSucceedValidatorHash)
 import Cardano.Node.Emulator.TimeSlot
 
 import Test.Common
@@ -50,7 +49,10 @@ successfullyCloseSingleProposalContract = do
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , creatorAddress = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                                     $ mockWalletPaymentPubKeyHash
+                                                     $ knownWallet 1) 
+                                   Nothing
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 10
@@ -104,7 +106,10 @@ successfullyCloseMultipleSameProposalContracts = do
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , creatorAddress = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                                     $ mockWalletPaymentPubKeyHash
+                                                     $ knownWallet 1) 
+                                   Nothing
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 10
@@ -166,7 +171,10 @@ successfullyCloseMultipleDifferentProposalContracts = do
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , creatorAddress = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                                     $ mockWalletPaymentPubKeyHash
+                                                     $ knownWallet 1) 
+                                   Nothing
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 10
@@ -177,7 +185,10 @@ successfullyCloseMultipleDifferentProposalContracts = do
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken2
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , creatorAddress = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                                     $ mockWalletPaymentPubKeyHash
+                                                     $ knownWallet 1) 
+                                   Nothing
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 10
@@ -303,7 +314,10 @@ onlyProposedBeaconNotBurned = do
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , creatorAddress = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                                     $ mockWalletPaymentPubKeyHash
+                                                     $ knownWallet 1) 
+                                   Nothing
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 10
@@ -357,7 +371,10 @@ atLeastOneProposedBeaconNotBurned = do
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , creatorAddress = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                                     $ mockWalletPaymentPubKeyHash
+                                                     $ knownWallet 1) 
+                                   Nothing
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 10
@@ -419,7 +436,10 @@ activeBeaconMinted = do
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , creatorAddress = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                                     $ mockWalletPaymentPubKeyHash
+                                                     $ knownWallet 1) 
+                                   Nothing
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 10
@@ -474,7 +494,10 @@ stakingCredDidNotApprove = do
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , creatorAddress = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                                     $ mockWalletPaymentPubKeyHash
+                                                     $ knownWallet 1) 
+                                   Nothing
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 10
@@ -528,7 +551,10 @@ successfullyCloseInvalidProposal = do
         , currentAssetQuantity = 100_000_000
         , desiredAsset = testToken1
         , strikePrice = unsafeRatio 1 10
-        , creatorAddress = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+        , creatorAddress = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                                     $ mockWalletPaymentPubKeyHash
+                                                     $ knownWallet 1) 
+                                   Nothing
         , premiumAsset = (adaSymbol,adaToken)
         , premium = 10_000_000
         , expiration = slotToBeginPOSIXTime def 10

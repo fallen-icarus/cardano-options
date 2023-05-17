@@ -31,7 +31,6 @@ import Plutus.Script.Utils.Ada (lovelaceValueOf)
 import Data.Default
 import Plutus.V2.Ledger.Api
 import Ledger.Address
-import Plutus.Script.Utils.V2.Generators (alwaysSucceedValidatorHash)
 import Cardano.Node.Emulator.TimeSlot
 
 import Test.Common
@@ -57,7 +56,10 @@ successfullyExecuteSingleContract = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
@@ -225,7 +227,10 @@ successfullyExecuteMultipleContractsFromSameAddress = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -523,7 +528,10 @@ successfullyExecuteMultipleContractsFromDifferentAddressesButSamePolicy = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -821,7 +829,10 @@ successfullyExecuteMultipleContractsFromDifferentAddressesAndPolicy = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -1107,7 +1118,10 @@ missingActiveBeacon = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
@@ -1236,7 +1250,10 @@ contractIsExpired = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
@@ -1392,7 +1409,10 @@ bothContractIdsBurned = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
@@ -1547,7 +1567,10 @@ noContractIDsBurned = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
@@ -1703,7 +1726,10 @@ activeBeaconNotBurned = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
@@ -1859,7 +1885,10 @@ creatorNotPaidReceipt = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
@@ -2014,7 +2043,10 @@ creatorNotPaidEnoughDesiredAsset = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
@@ -2170,7 +2202,10 @@ creatorNotReturnedMinDeposit = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
   
   callEndpoint @"create-assets-utxo" h1 $
     AssetsParams
@@ -2326,7 +2361,10 @@ paymentToWrongAddress = do
         }
       optionsAddr1 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred1)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash 
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) 
+                             Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 

@@ -31,7 +31,7 @@ import Plutus.Script.Utils.Ada (lovelaceValueOf)
 import Data.Default
 import Plutus.V2.Ledger.Api
 import Ledger.Address
-import Plutus.Script.Utils.V2.Generators (alwaysSucceedValidatorHash,alwaysSucceedPolicy)
+import Plutus.Script.Utils.V2.Generators (alwaysSucceedPolicy)
 import Cardano.Node.Emulator.TimeSlot
 import Plutus.Script.Utils.V2.Scripts (scriptCurrencySymbol)
 
@@ -70,7 +70,9 @@ successfullyAcceptSingleContract = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -279,7 +281,9 @@ activeBeaconNotMinted = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -487,7 +491,9 @@ assetsBeaconNotBurned = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -696,7 +702,9 @@ proposedBeaconNotBurned = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -905,7 +913,9 @@ multipleActiveBeaconsMinted = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -1114,7 +1124,9 @@ contractIDsNotMinted = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -1322,7 +1334,9 @@ additionalContractIDsMinted = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -1531,7 +1545,9 @@ additionalTokensMinted = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -1740,7 +1756,9 @@ acceptDifferentContractsFromDifferentAddressses = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -1962,7 +1980,9 @@ acceptSameContractsFromOtherAddressesWithDoubleSatisfaction = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -2181,7 +2201,9 @@ additionalProposedInputFromDappAddress = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -2394,7 +2416,9 @@ additionalAssetsInputFromDappAddress = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -2608,7 +2632,9 @@ missingProposedInput = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -2813,7 +2839,9 @@ missingAssetsInput = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -3017,7 +3045,9 @@ missingBothInputs = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -3219,7 +3249,9 @@ additionalNonSignificantInputFromAddress = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -3447,7 +3479,9 @@ contractIdDoesntMatchAssetsUTxO = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -3656,7 +3690,9 @@ contractIDsDontMatchRedeemer = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -3865,7 +3901,9 @@ differentBeaconSymbolsInTokenName = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -4074,7 +4112,9 @@ differentCurrentAssetQuantity = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -4283,7 +4323,9 @@ wrongRedeemerStakingCredential = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -4492,7 +4534,9 @@ minDepositNotPaidToCreator = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -4700,7 +4744,9 @@ premiumNotPaidToCreator = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -4908,7 +4954,9 @@ premiumPaidToWrongAddress = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -5117,7 +5165,9 @@ premiumSplitOverMultipleOutputs = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -5328,7 +5378,9 @@ missingOptionsOutput = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -5531,7 +5583,9 @@ optionsOutputToDifferentDappAddress = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -5740,7 +5794,9 @@ multipleOutputsToDappAddress = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -5952,7 +6008,9 @@ activeOutputMissingMinDeposit = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -6160,7 +6218,9 @@ activeOutputMissingCurrentAsset = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -6368,7 +6428,9 @@ activeOutputMissingActiveBeacon = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -6576,7 +6638,9 @@ activeOutputMissingContractId = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -6784,7 +6848,9 @@ activeOutputHasBothContractIds = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -6993,7 +7059,9 @@ datumHasWrongBeaconSymbol = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -7202,7 +7270,9 @@ datumHasWrongCurrentAsset = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -7411,7 +7481,9 @@ datumHasWrongCurrentAssetQuantity = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -7620,7 +7692,9 @@ datumHasWrongDesiredAsset = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -7829,7 +7903,9 @@ datumHasWrongStrikePrice = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -8038,7 +8114,9 @@ datumHasWrongCreatorAddress = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -8247,7 +8325,9 @@ datumHasWrongPremiumAsset = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -8456,7 +8536,9 @@ datumHasWrongPremium = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -8665,7 +8747,9 @@ datumHasWrongExpiration = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 
@@ -8874,7 +8958,9 @@ datumHasWrongContractId = do
                              (Just $ StakingHash optionsStakingCred1)
       optionsAddr2 = Address (ScriptCredential optionsValidatorHash)
                              (Just $ StakingHash optionsStakingCred2)
-      creatorAddr1 = Address (ScriptCredential alwaysSucceedValidatorHash) Nothing
+      creatorAddr1 = Address (PubKeyCredential $ unPaymentPubKeyHash
+                                               $ mockWalletPaymentPubKeyHash
+                                               $ knownWallet 2) Nothing
       creatorAddr2 = 
         Address ( PubKeyCredential 
                 $ unPaymentPubKeyHash 

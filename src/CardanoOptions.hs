@@ -250,6 +250,11 @@ stakingCredApproves addr info = case addressStakingCredential addr of
   
   Just _ -> traceError "Wrong kind of staking credential."
 
+{-# INLINABLE isPaymentPubKeyCred #-}
+isPaymentPubKeyCred :: Address -> Bool
+isPaymentPubKeyCred (Address (PubKeyCredential _) _) = True
+isPaymentPubKeyCred _ = False
+
 -- | This function does the input validation for MintActiveBeacon of the beacon policy.
 -- It will either fail with an appropriate error or return what the output datum should
 -- be based on the two inputs. As long as the datums agree, all of the info for the new
@@ -576,8 +581,9 @@ mkOptionsBeaconPolicy OptionsConfig{..} appName valHash r ctx@ScriptContext{scri
       --     c) currentAssetQuantity > 0
       --     d) desiredAsset == desiredAssetConfig
       --     e) strikePrice > 0
-      --     f) premium > 0
-      --     g) expiration > 0
+      --     f) creatorAddress must use a payment pubkey
+      --     g) premium > 0
+      --     h) expiration > 0
       -- 4) Each Proposed beacon must be stored with the value:
       --     a) 3 ADA <> 1 Proposed beacon
       -- Hard coding the minUTxO value to 3 makes it easier to ensure the contract creator's 
@@ -703,6 +709,7 @@ mkOptionsBeaconPolicy OptionsConfig{..} appName valHash r ctx@ScriptContext{scri
       | currentAssetQuantity <= 0 = traceError "Invalid ProposedContract currentAssetQuantity"
       | desiredAsset /= desiredAssetConfig = traceError "Invalid ProposedContract desiredAsset"
       | strikePrice <= fromInteger 0 = traceError "Invalid ProposedContract strikePrice"
+      | not $ isPaymentPubKeyCred creatorAddress = traceError "Invalid ProposedContract creatorAddress"
       | premium <= 0 = traceError "Invalid ProposedContract premium"
       | expiration <= 0 = traceError "Invalid ProposedContract expiration"
       | otherwise = True

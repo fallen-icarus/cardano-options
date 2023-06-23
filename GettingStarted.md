@@ -1284,3 +1284,15 @@ This user currently has only one Active contract at their options address. The `
 ```
 
 The information for the target contract was returned. The `info` field is the datum.
+
+### Own Contracts
+Looking from the perspective of the user with the contractID key.
+
+``` JSON
+[
+  {
+    "asset": "7a922050dc48ec0914a3e1c74aad5056de536e7f7cef71f1581a294d.82653d2221932d287f69f5169b7b96e87866cceae698e4a4e8f4ba1b2030caa6",
+    "quantity": 1
+  }
+]
+```

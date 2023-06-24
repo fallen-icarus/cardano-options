@@ -191,7 +191,7 @@ cardano-loans convert-time --posix-time 1682351790000
 
 ---
 ## Address Conversions
-Since plutus smart contracts do not use bech32 encoded addresses while cardano-cli does, addresses will need to be converted as necessary. To make this as painless as possible, `cardano-options` is capable of doing these conversions for you. It uses `cardano-addresses` under the hood.
+Since plutus smart contracts do not use bech32 encoded addresses while cardano-cli does, addresses will need to be converted as necessary. To make this as painless as possible, `cardano-options` is capable of doing these conversions for you. It uses [`cardano-addresses`](https://github.com/input-output-hk/cardano-addresses) under the hood.
 
 ### Plutus Hashes to Bech32
 ``` Bash

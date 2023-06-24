@@ -4,7 +4,7 @@
 
 Template bash scripts that follow these steps are available [here](scripts/).
 
-When integration testing, it is highly recommended that you change the string passed to the mkBeaconPolicy function [here](src/CardanoOptions.hs#L188). When developers make mistakes (myself included), it can create bad/locked utxos that will appear when you query the beacons. This can complicate your own testing. To avoid this, this extra parameter was added. Change the string to something unique to you. You should remember to change it to the desired string for mainnet.
+When integration testing, it is highly recommended that you change the string passed to the mkBeaconPolicy function [here](src/CardanoOptions.hs#L197). When developers make mistakes (myself included), it can create bad/locked utxos that will appear when you query the beacons. This can complicate your own testing. To avoid this, this extra parameter was added. Change the string to something unique to you. You should remember to change it to the desired string for mainnet.
 
 **Make this change before building the executable in the next section.**
 

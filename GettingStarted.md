@@ -201,7 +201,7 @@ cardano-options convert-address \
   --stdout
 ```
 
-All bech32 addresses generated with this command will be for the preproduction testnet.
+All bech32 addresses generated with this command will be for the preproduction testnet. When the protocol is ready for mainnet, support will be added for mainnet addresses.
 
 ### Bech32 to Plutus Hashes
 ``` Bash

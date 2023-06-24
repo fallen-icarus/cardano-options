@@ -134,7 +134,7 @@ Options writers utilize the `MintAssetsBeacon` and `MintProposedBeacons` minting
 ##### Preparing Cover Assets:
 Writers first create an AssetsForContract UTxO, which contains the asset that will underwrite their proposed options contracts, 5 ADA (hardcoded minUTxO fee), and the Assets Beacon Token. They must also specify which asset the contract will be priced in (their desired swap Asset).
 
-![[image]]
+![Preparing Underlying](https://github.com/zhekson1/cardano-options/blob/main/images/Underlying%20Asset.jpg)
 
 The `MintAssetsBeacon` redeemer mints an `Assets` Beacon if and only if the following conditions are met:
 
@@ -164,7 +164,7 @@ Writers can close/reclaim an AssetsForContract UTxO using the `CloseAssets` vali
 ##### Writing Contract Offers:
 Next, the writer may create one or many ProposedContract UTxOs of varying terms (expirations, premiums, strike prices) against a single AssetsForContract UTxO. Each ProposedContract UTxO must contain a Proposed Beacon Token, a Proposed Contract Datum, and 3 ADA (hardcoded minUTxO fee).
 
-![[images/]]
+![Proposals](https://github.com/zhekson1/cardano-options/blob/main/images/Writing%20Option%20Spread.jpg)
 
 The `MintProposedBeacons` redeemer mints Proposed Beacon(s) if and only if the following conditions are met:
 
@@ -199,11 +199,7 @@ Writers can close/reclaim Proposed Contract UTxOs using the `CloseProposedContra
 #### 2. Buying an Option Contract
 Prospective buyers can search for available contracts by querying Asset and Proposed Beacons, which have unique policyIDs for every asset pair. Buyers buy a contract by constructing a transaction using the `MintActiveBeacon` minting redeemer and the `AcceptContract` validator redeemer. 
 
-![[images]]
-
-
-The `AcceptContract` Redeemer checks that the `Active`  Beacon Token is minted. This guarantees that the minting policy was executed in the same Tx, which is what
-
+![Buying Option](https://github.com/zhekson1/cardano-options/blob/main/images/Buying%20Option.jpg)
 
 The `MintActiveBeacon` minting redeemer mints one `Active` Beacon and two `ContractID` Beacons, if and only if the following conditions are met:
 
@@ -221,13 +217,15 @@ The `MintActiveBeacon` minting redeemer mints one `Active` Beacon and two `Contr
 	- Must contain the same quantity of assets as in the AssetForContract UTxO, 1 Active Beacon Token, 1 ContractID Token, and 5 ADA
 	- The datum fields of the output must exactly match the datum fields of the ProposedContract input, plus one extra field: `contractID` - whose value is the Tx hash supplied by the `AcceptContract` Redeemer
 
-The `AcceptContract` validator redeemer simply checks that an Active Token is minted. This guarantees that the minting policy was executed in the same Tx, which does all the checks.
+The `AcceptContract` Redeemer checks that the `Active`  Beacon Token is minted. This guarantees that the minting policy is executed in the same Tx (which is what enforces the actual logic).
 
 :notebook: Buying multiple contracts in a single Tx is currently not supported. This dramatically simplifies the code.
 
 
 #### 3. Exercising an Option Contract
 Whoever owns the ContractID "Key" Beacon Token can locate the underlying Active Contract UTxO (which contains the corresponding ContractID "Lock" Token) and exercise the option, until expiry. 
+
+![Exercising Option](https://github.com/zhekson1/cardano-options/blob/main/images/Exercising%20Option.jpg)
 
 To exercise the contract, they use the `ExecuteContract` validator redeemer, which checks that all of the following conditions are met:
 
@@ -240,11 +238,6 @@ To exercise the contract, they use the `ExecuteContract` validator redeemer, whi
 	- `desiredAsset` in the amount of {`currentAssetQuantity` * `strikePrice`}
 	- 1 `ContractID` Token
 
-![Image]
-
-
-
-
 In the above example, the contractID "Key" Token and the Payment do not necessarily have to come from the same UTxO nor the same address.
 
 :notebook: the second contractID token is not burned, and is instead used as a "receipt of payment" to guarantee unique outputs. This prevents double satisfaction, despite composing executions.
@@ -255,8 +248,12 @@ The option writer may reclaim expired options using the `CloseExpiredContract` v
 1. The UTxO must have an `ActiveContract` datum.
 2. The address' staking credential must signal approval (via signature).
 
+![Reclaiming Option](https://github.com/zhekson1/cardano-options/blob/main/images/Reclaiming%20Option.jpg)
+
 ##### Updating Payment Address of an Active Option
 Option writers may wish to update their desired payment address (the address which receives premium and payment, upon the Contract being exercised). They can do this with the `UpdateAddress` validator redeemer, which updates the `creatorAddress` datum field.
+
+![Updating Address](https://github.com/zhekson1/cardano-options/blob/main/images/Update%20Address.jpg)
 
 To do this, all of the following conditions must be met:
 
@@ -273,9 +270,9 @@ To do this, all of the following conditions must be met:
 ### Interoperability & Composability
 Cardano-Options is fully composable with Cardano-Swaps, down to the TX level. For example, when exercising an option, payment can be an input from a swap that is executed in the same TX. Below is an example where Alice exercises an option to buy 1000 ADA for 500 DJED, where the DJED comes from a USDA:DJED swap address.
 
-![Image]
+![Option-Swap Composition](https://github.com/zhekson1/cardano-options/blob/main/images/Option-Swap%20Composition.jpg)
 
-
+-------
 
 ### Fee Estimations
 | Transaction Type | Fee Estimation |
@@ -303,9 +300,6 @@ With further optimizations to Plutus Core, more efficient languages, increased e
 
 ### Buying Multiple Options in One Transaction
 Buying multiple options in one Tx necessitates a lot more logic to enforce proper behavior. Again, this may be possible with future optimizations, but is currently unsupported.
-
-
-
 
 
 ## Conclusion

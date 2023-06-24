@@ -14,10 +14,8 @@ A p2p derivatives protocol for writing, buying, and trading American-style *cove
 ## Abstract
 Cardano-Options is a fully p2p protocol for writing, buying, and trading American-style *covered* options contracts on the Cardano Settlement Layer (CSL). Users maintain delegation control of assets at all times.
 
-
 ## Motivation
 Options contracts play a vital role in the economy by providing a mechanism for risk management, improving market efficiency, and enhancing price discovery. This is especially important for an endogenous p2p economy that does not rely off-chain price feeds.
-
 
 ## Preliminary Discussion
 Typically, options are explicitly categorized as either calls or puts. This is not necessary in Cardano-Options, since all assets on Cardano, including stablecoins, are first-class citizens. A call or a put is defined *implicitly*, based on the nature of the underlying "locked" asset. For example, a "put" option for ADA (priced in USD) is created by writing an option to swap ADA against a locked UTxO containing a stablecoin, such as DJED or USDA. For "call" options it would be the opposite - the locked UTxO contains ADA, to be swapped for a stablecoin. 
@@ -35,7 +33,7 @@ Users sell covered options contracts that are redeemable via a tradable NFT.
 
 
 ## Specification
-The protocol is composed of one minting policy and one validator script that work together. All options, no matter how different the terms, use the same minting policy and validator script. 
+The protocol is composed of one validator script and multiple asset-pair specific minting policies that work together. All options, no matter how different the terms, use the same validator script. Minting policies are unique for every asset-pair.
 
 ### Components
 An outline of the addresses, tokens, datums, and redeemers used in Cardano-Options
@@ -93,7 +91,8 @@ data OptionsDatum
       }
 ```
 
-The minting policy also uses the `OptionsConfig` parameter to enforce a unique minting policy for every asset-pair. This is similar in function to the SwapConfig parameter in Cardano-Swaps.
+#### OptionConfig Parameter
+The minting policy also uses the `OptionsConfig` parameter to enforce a unique minting policy for every asset-pair. This is similar in function to the `SwapConfig` parameter in Cardano-Swaps.
 
 ```Haskell
 data OptionsConfig = OptionsConfig
@@ -127,9 +126,9 @@ data OptionsBeaconRedeemer
   | MintProposedBeacons
   -- | Mint the Active beacon and ContractId for an accepted contract:
   | MintActiveBeacon
-      TokenName -- ^ <Tx hash of the AssetsForContract UTxO used to accept the contract>
+      TokenName -- ^ Tx hash of the AssetsForContract UTxO used to accept the contract
       Credential 
-        -- ^ <The staking credential for the options address being used. Either a script or pubkey>
+        -- ^ The staking credential for the options address being used. Either a script or pubkey
   | BurnBeacons
   deriving (Haskell.Show,Generic)
 ```
@@ -164,12 +163,12 @@ The `MintAssetsBeacon` redeemer mints an `Assets` Beacon if and only if the foll
 > 5 ADA is used a min deposit to enforce fair circulation of minUTxO fees between the options writer/buyer. If it were not hardcoded, the buyer would be able to siphon some of the writer's minUTxO, depending on the size of the contract. This deposit is eventually returned to the writer.
 
 ##### Closing the "Cover" UTxO:
-Writers can close/reclaim an AssetsForContract UTxO using the `CloseAssets` validator redeemer. To do this, all of the following must conditions be true:
+Writers can close/reclaim an AssetsForContract UTxO using the `BurnBeacon` minting redeemer and the `CloseAssets` validator redeemer. To do this, all of the following must conditions be true:
 
-1. The UTxO must have an AssetsForContract datum.
+1. The UTxO must have an `AssetsForContract` datum.
 2. All `Assets` Beacons among Tx inputs must be burned.
-3. No Active beacons can be minted (this prevents combining redeemers and producing unexpected behaviors.)
-4. The address' staking credential must signal approval.
+3. No `Active` beacons can be minted (this prevents combining redeemers and producing unexpected behaviors.)
+4. The address' staking credential must signal approval (via key or script).
 
 ##### Writing Contract Offers:
 Next, the writer may create one or many `ProposedContract` UTxOs of varying terms (expirations, premiums, strike prices) against a single `AssetsForContract` UTxO. Each `ProposedContract` UTxO must contain a `Proposed Beacon Token`, a Proposed Contract Datum, and 3 ADA (hardcoded minUTxO fee). 
@@ -199,11 +198,11 @@ The `MintProposedBeacons` redeemer mints Proposed Beacon(s) if and only if the f
 > 3 ADA is enough here because there won't ever be value-assets stored in the proposal UTxOs, and all proposal UTxOs are roughly the same size. This deposit is enough for all the datum information, and is eventually returned to the writer during the premium payment.
 
 ##### Closing Proposed Contracts:
-Writers can close/reclaim Proposed Contract UTxOs using the `CloseProposedContracts` validator redeemer. To do this, all of the following conditions must be true:
+Writers can close/reclaim Proposed Contract UTxOs using the `BurnBeacon` minting redeemer and the `CloseProposedContracts` validator redeemer. To do this, all of the following conditions must be true:
 
-1. The UTxO must have a ProposedContract datum.
+1. The UTxO must have a `ProposedContract` datum.
 2. All `Proposed` Beacons among Tx inputs must be burned.
-3. No Active beacons can be minted (this prevents combining redeemers and producing unexpected behaviors.)
+3. No `Active` beacons can be minted (this prevents combining redeemers and producing unexpected behaviors.)
 4. The address' staking credential must signal approval.
 
 #### 2. Buying an Option Contract
@@ -249,10 +248,10 @@ To exercise the contract, the contract owner uses the `BurnBeacon` minting redee
 In the above example, the `contractID` "Key" Token and the Payment do not necessarily have to come from the same UTxO nor the same address.
 
 > **Note**
-> The second contractID token is not burned, and is instead used as a "receipt of payment" to guarantee unique outputs. This prevents double satisfaction, despite composing executions. However, future versions of Cardano-Options burn both ContractIDs (further explained in the [Future Directions](#future-directions) section)
+> The second contractID token is not burned, and is instead used as a "receipt of payment" to guarantee unique outputs. This prevents double satisfaction, despite composing executions. Future versions of Cardano-Options may burn both ContractIDs (further explained in the [Future Directions](#future-directions) section).
 
 ##### Closing/Reclaiming an Expired Option
-The option writer may reclaim expired options using the `BurnBeacons` minting redeemer and the `CloseExpiredContract` validator redeemer. 
+The option writer may reclaim expired options using the `BurnBeacon` minting redeemer and the `CloseExpiredContract` validator redeemer. 
 
 ![Reclaiming Option](./images/Reclaiming-Option.jpg)
 
@@ -284,6 +283,11 @@ To do this, all of the following conditions must be met:
 
 ## Features Discussion
 A discussion of features unique to Cardano-Options.
+
+### Trade-able Options Contracts
+Querying the location and the right to exercise an (unexpired) option is fully encapsulated in the `ContractID` "Key" Beacon Token. These tokens can be traded on a secondary market, just like in traditional options markets. With enough liquidity, option buyers may buy options speculatively, with confidence they'd be able to sell them to a market maker (instead of having to exercise it themselves).
+
+[Secondary Market Stuff]
 
 ### Staking Script Credentials
 Since owner-related actions of script addresses are overloaded to the staking credentials, users can secure their addresses either with a simple stake key or a more complex stake script (Native or Plutus). In the case of simple stake key, a regular signature from the stake key will suffice. In the case of a script however, the staking script must be executed (i.e. withdraw 0 ADA from rewards) in the same TX. This means stake address registration is not necessary when using simple stake keys, but is necessary when using staking scripts.
@@ -320,16 +324,21 @@ Being a PoC, v1 of Cardano-Options is intended to demonstrate the capacity for a
 With further optimizations to Plutus Core, more efficient languages, increased execution limits, or all three, it may be possible to enforce that the option exerciser outputs payments to the writer with proper datums. Alternatively, Plutus Core may be updated such that scripts may be executed even if there is no datum.
 
 ### Burning Both ContractID Tokens
-Currently, one of the ContractIDs is burned when an option is exercised, and the other is included in one of the outputs to prevent double satisfaction. Future versions of Cardano-Options will burn both, and will instead prevent double satisfaction via datums. This will decrease minUTxO fees and mitigate bloat.
+Currently, one of the ContractIDs is burned when an option is exercised, and the other is included in one of the outputs to prevent double satisfaction. Future versions of Cardano-Options may instead burn both, and prevent double satisfaction via datums. This would mitigate the number of "used" ContractIDs floating around, thereby decreasing Tx and UTxO bloat.
+
+### Variable minUTxO Deposits
+Currently, there are hardcoded minUTxO deposits (5 ADA for the "AssetsForContract" UTxO, and 3 ADA for each "Proposal" UTxO). This prevents option buyers from siphoning deposits, and ensures minUTxO fees are eventually returned to the writer. Instead of hardcoding this deposit, future versions of the protocol may introduce a new "deposit" datum field that would enable variable deposit fees.
 
 ### Buying Multiple Options in One Transaction
-Currently, multiple options cannot be bought in a single transaction. This was done for the sake of v1 simplicity, but future versions of Cardano-Options will support buying multiple options in one transaction. This would lower fees and increase throughput of the protocol.
+Currently, multiple options cannot be bought in a single transaction. This was done for the sake of v1 simplicity, but future versions of Cardano-Options may support buying multiple options in one transaction. This would lower fees and increase throughput of the protocol.
 
 ### Underlying Assets & Proposal Consolidation
-Currently, it takes one transaction to prepare the underlying "Assets For Contract" UTxO, and another transaction to write contract proposal UTxOs against the underlying. This can be consolidated into one transaction, where the underlying and the proposals are output simultaneously. This would lower fees and increase throughput of the protocol.
+Currently, it takes one transaction to prepare the underlying "Assets For Contract" UTxO, and another transaction to write contract proposal UTxOs against the underlying. This may be consolidated into one transaction, where the underlying and the proposals are output simultaneously. This would lower fees and increase throughput of the protocol.
+
+Furthermore, when a contract is bought, there may be leftover Proposal UTxOs if the writer made multiple proposals against the underlying. Currently, these must be reclaimed in a separate TX, but future versions of Cardano-Options may incorporate reclamation of Proposal UTxOs into the Buy-Option transaction.
 
 ### Expired Option Rollovers
-Most option writers are in the business of writing options regularly, and will often "rollover" expired options into new offers. Currently, this takes two transactions (one for reclaiming an expired option, and another to prepare a new asset UTxO). With the addition of a new redeemer, it is possible to consolidate this rollover into a single transaction. This would lower fees and increase throughput of the protocol.
+Most option writers are in the business of writing options regularly, and will often "rollover" expired options into new offers. Currently, this takes two transactions (one for reclaiming an expired option, and another to prepare a new asset UTxO). With the addition of a new redeemer, it may be possible to consolidate this rollover into a single transaction. This would lower fees and increase throughput of the protocol.
 
 
 ## Conclusion

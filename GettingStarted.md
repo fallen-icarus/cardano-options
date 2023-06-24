@@ -226,19 +226,19 @@ The `network_tag` of 0 corresponds to the Preproduction testnet (1 would be Main
 ---
 ## Create an Asset UTxO
 
-### Calculate the staking pubkey hash for the writer.
+#### Calculate the staking pubkey hash for the writer.
 ``` Bash
 writerPubKeyHash=$(cardano-cli stake-address key-hash \
   --stake-verification-key-file writeStake.vkey)
 ```
 
-### Export the Options validator script.
+#### Export the Options validator script.
 ``` Bash
 cardano-options export-script options-script \
   --out-file options.plutus
 ```
 
-### Create the writer's option address.
+#### Create the writer's option address.
 ``` Bash
 cardano-cli address build \
   --payment-script-file options.plutus \
@@ -247,7 +247,7 @@ cardano-cli address build \
   --out-file writerOption.addr
 ```
 
-### Export the beacon policy script for that trading pair.
+#### Export the beacon policy script for that trading pair.
 ``` Bash
 cardano-options export-script beacon-policy \
   --current-asset-is-lovelace \
@@ -256,19 +256,19 @@ cardano-options export-script beacon-policy \
   --out-file beacons.plutus
 ```
 
-### Calculate the beacon policy id.
+#### Calculate the beacon policy id.
 ``` Bash
 beaconPolicyId=$(cardano-cli transaction policyid \
   --script-file beacons.plutus) 
 ```
 
-### Create the minting redeemer.
+#### Create the minting redeemer.
 ``` Bash
 cardano-options beacon-redeemer mint-assets \
   --out-file mintAsset.json
 ```
 
-### Create the AssetDatum.
+#### Create the AssetDatum.
 ``` Bash
 cardano-options options-datum assets-datum \
   --beacon-policy-id $beaconPolicyId \
@@ -278,12 +278,12 @@ cardano-options options-datum assets-datum \
   --desired-asset-token-name 4f74686572546f6b656e0a \
   --out-file assetDatum.json
 ```
-### Create a helper beacon variable.
+#### Create a helper beacon variable.
 ``` Bash
 assetsBeacon="${beaconPolicyId}.417373657473"
 ```
 
-### Create and submit the transaction.
+#### Create and submit the transaction.
 ``` Bash
 cardano-cli query protocol-parameters \
   --testnet-magic 1 \
@@ -320,19 +320,19 @@ cardano-cli transaction submit \
 
 It is possible to close multiple Asset UTxOs in a single transaction.
 
-### Calculate the staking pubkey hash for the writer.
+#### Calculate the staking pubkey hash for the writer.
 ``` Bash
 writerPubKeyHash=$(cardano-cli stake-address key-hash \
   --stake-verification-key-file writeStake.vkey)
 ```
 
-### Export the Options validator script.
+#### Export the Options validator script.
 ``` Bash
 cardano-options export-script options-script \
   --out-file options.plutus
 ```
 
-### Export the beacon policy script for that trading pair.
+#### Export the beacon policy script for that trading pair.
 ``` Bash
 cardano-options export-script beacon-policy \
   --current-asset-is-lovelace \
@@ -341,30 +341,30 @@ cardano-options export-script beacon-policy \
   --out-file beacons.plutus
 ```
 
-### Calculate the beacon policy id.
+#### Calculate the beacon policy id.
 ``` Bash
 beaconPolicyId=$(cardano-cli transaction policyid \
   --script-file beacons.plutus) 
 ```
 
-### Create the burning redeemer.
+#### Create the burning redeemer.
 ``` Bash
 cardano-options beacon-redeemer burn-beacons \
   --out-file burn.json
 ```
 
-### Create the spending redeemer.
+#### Create the spending redeemer.
 ``` Bash
 cardano-options options-redeemer close-assets \
   --out-file closeAssets.json
 ```
 
-### Create a helper beacon variable.
+#### Create a helper beacon variable.
 ``` Bash
 assetsBeacon="${beaconPolicyId}.417373657473"
 ```
 
-### Create and submit the transaction.
+#### Create and submit the transaction.
 ``` Bash
 cardano-cli query protocol-parameters \
   --testnet-magic 1 \
@@ -400,19 +400,19 @@ cardano-cli transaction submit \
 ---
 ## Create Proposal UTxOs
 
-### Calculate the staking pubkey hash for the writer.
+#### Calculate the staking pubkey hash for the writer.
 ``` Bash
 writerPubKeyHash=$(cardano-cli stake-address key-hash \
   --stake-verification-key-file writeStake.vkey)
 ```
 
-### Export the Options validator script.
+#### Export the Options validator script.
 ``` Bash
 cardano-options export-script options-script \
   --out-file options.plutus
 ```
 
-### Export the beacon policy script for that trading pair.
+#### Export the beacon policy script for that trading pair.
 ``` Bash
 cardano-options export-script beacon-policy \
   --current-asset-is-lovelace \
@@ -421,24 +421,24 @@ cardano-options export-script beacon-policy \
   --out-file beacons.plutus
 ```
 
-### Calculate the beacon policy id.
+#### Calculate the beacon policy id.
 ``` Bash
 beaconPolicyId=$(cardano-cli transaction policyid \
   --script-file beacons.plutus) 
 ```
 
-### Create the minting redeemer.
+#### Create the minting redeemer.
 ``` Bash
 cardano-options beacon-redeemer mint-proposal \
   --out-file mintProposed.json
 ```
 
-### Create a helper beacon variable.
+#### Create a helper beacon variable.
 ``` Bash
 proposedBeacon="${beaconPolicyId}.50726f706f736564"
 ```
 
-### Create the ProposedDatum. Create as many as necessary.
+#### Create the ProposedDatum. Create as many as necessary.
 ``` Bash
 cardano-options options-datum proposal-datum \
   --beacon-policy-id $beaconPolicyId \
@@ -457,7 +457,7 @@ cardano-options options-datum proposal-datum \
 
 The above datum's writer address is just the writer's personal address without a staking credential. It is also possible to use an address with a staking credential. Execute `cardano-options options-datum proposal-datum --help` for details.
 
-### Create and submit the transaction.
+#### Create and submit the transaction.
 ``` Bash
 cardano-cli query protocol-parameters \
   --testnet-magic 1 \
@@ -492,19 +492,19 @@ cardano-cli transaction submit \
 ---
 ## Close Proposal UTxOs
 
-### Calculate the staking pubkey hash for the writer.
+#### Calculate the staking pubkey hash for the writer.
 ``` Bash
 writerPubKeyHash=$(cardano-cli stake-address key-hash \
   --stake-verification-key-file writeStake.vkey)
 ```
 
-### Export the Options validator script.
+#### Export the Options validator script.
 ``` Bash
 cardano-options export-script options-script \
   --out-file options.plutus
 ```
 
-### Export the beacon policy script for that trading pair.
+#### Export the beacon policy script for that trading pair.
 ``` Bash
 cardano-options export-script beacon-policy \
   --current-asset-is-lovelace \
@@ -513,30 +513,30 @@ cardano-options export-script beacon-policy \
   --out-file beacons.plutus
 ```
 
-### Calculate the beacon policy id.
+#### Calculate the beacon policy id.
 ``` Bash
 beaconPolicyId=$(cardano-cli transaction policyid \
   --script-file beacons.plutus) 
 ```
 
-### Create the burning redeemer.
+#### Create the burning redeemer.
 ``` Bash
 cardano-options beacon-redeemer burn-beacons \
   --out-file burn.json
 ```
 
-### Create the spending redeemer.
+#### Create the spending redeemer.
 ``` Bash
 cardano-options options-redeemer close-proposal \
   --out-file closeProposed.json
 ```
 
-### Create helper Proposed beacon variable.
+#### Create helper Proposed beacon variable.
 ``` Bash
 proposedBeacon="${beaconPolicyId}.50726f706f736564"
 ```
 
-### Create and submit the transaction.
+#### Create and submit the transaction.
 ``` Bash
 cardano-cli query protocol-parameters \
   --testnet-magic 1 \
@@ -574,13 +574,13 @@ cardano-cli transaction submit \
 
 In this version of the protocol, only one contract can be purchased per tx.
 
-### Export the Options validator script.
+#### Export the Options validator script.
 ``` Bash
 cardano-options export-script options-script \
   --out-file options.plutus
 ```
 
-### Export the beacon policy script for that trading pair.
+#### Export the beacon policy script for that trading pair.
 ``` Bash
 cardano-options export-script beacon-policy \
   --current-asset-is-lovelace \
@@ -589,13 +589,13 @@ cardano-options export-script beacon-policy \
   --out-file beacons.plutus
 ```
 
-### Calculate the beacon policy id.
+#### Calculate the beacon policy id.
 ``` Bash
 beaconPolicyId=$(cardano-cli transaction policyid \
   --script-file beacons.plutus) 
 ```
 
-### Create the minting redeemer.
+#### Create the minting redeemer.
 ``` Bash
 cardano-options beacon-redeemer mint-active \
   --contract-id <tx_hash_of_the_asset_utxo_to_be_consumed> \
@@ -603,7 +603,7 @@ cardano-options beacon-redeemer mint-active \
   --out-file mintActive.json
 ```
 
-### Create helper beacon variables.
+#### Create helper beacon variables.
 ``` Bash
 assetsBeacon="${beaconPolicyId}.417373657473"
 proposedBeacon="${beaconPolicyId}.50726f706f736564"
@@ -611,7 +611,7 @@ activeBeacon="${beaconPolicyId}.416374697665"
 contractIDBeacon="${beaconPolicyId}.<tx_hash_of_the_asset_utxo_to_be_consumed>"
 ```
 
-### Create the datum for the accepted contract.
+#### Create the datum for the accepted contract.
 ``` Bash
 cardano-options options-datum active-datum \
   --beacon-policy-id $beaconPolicyId \
@@ -631,20 +631,20 @@ cardano-options options-datum active-datum \
 
 Make sure the terms match those in the proposed and asset datums otherwise the transaction will fail.
 
-### Create the spending redeemer.
+#### Create the spending redeemer.
 ``` Bash
 cardano-options options-redeemer purchase-contract \
   --out-file purchase.json
 ```
 
-### Create the target address for the premium payment (from the proposed datum).
+#### Create the target address for the premium payment (from the proposed datum).
 ``` Bash
 premiumAddr=$(cardano-options convert-address \
   --payment-pubkey-hash "fe90abc294e5f876d44f9b39583f2e6d905322c4735e3bda2928342f" \
   --stdout)
 ```
 
-### Create and submit the transaction.
+#### Create and submit the transaction.
 ``` Bash
 cardano-cli query protocol-parameters \
   --testnet-magic 1 \
@@ -687,13 +687,13 @@ cardano-cli transaction submit \
 ---
 ## Execute Contract
 
-### Export the Options validator script.
+#### Export the Options validator script.
 ``` Bash
 cardano-options export-script options-script \
   --out-file options.plutus
 ```
 
-### Export the beacon policy script for that trading pair.
+#### Export the beacon policy script for that trading pair.
 ``` Bash
 cardano-options export-script beacon-policy \
   --current-asset-is-lovelace \
@@ -702,25 +702,25 @@ cardano-options export-script beacon-policy \
   --out-file beacons.plutus
 ```
 
-### Calculate the beacon policy id.
+#### Calculate the beacon policy id.
 ``` Bash
 beaconPolicyId=$(cardano-cli transaction policyid \
   --script-file beacons.plutus) 
 ```
 
-### Create the burning redeemer.
+#### Create the burning redeemer.
 ``` Bash
 cardano-options beacon-redeemer burn-beacons \
   --out-file burn.json
 ```
 
-### Create the spending redeemer.
+#### Create the spending redeemer.
 ``` Bash
 cardano-options options-redeemer execute-contract \
   --out-file execute.json
 ```
 
-### Create the payment address where the desired asset will be sent (from the datum).
+#### Create the payment address where the desired asset will be sent (from the datum).
 ``` Bash
 writerAddr=$(cardano-options convert-address \
   --payment-pubkey-hash "fe90abc294e5f876d44f9b39583f2e6d905322c4735e3bda2928342f" \
@@ -728,13 +728,13 @@ writerAddr=$(cardano-options convert-address \
   --stdout)
 ```
 
-### Create helper beacon variables.
+#### Create helper beacon variables.
 ``` Bash
 activeBeacon="${beaconPolicyId}.416374697665"
 contractIDBeacon="${beaconPolicyId}.<contract_id_to_execute>"
 ```
 
-### Create and submit the transaction.
+#### Create and submit the transaction.
 ``` Bash
 cardano-cli query protocol-parameters \
   --testnet-magic 1 \
@@ -769,21 +769,21 @@ cardano-cli transaction submit \
 ```
 
 ---
-### Close an expired contract.
+#### Close an expired contract.
 
-### Calculate the staking pubkey hash for the writer.
+#### Calculate the staking pubkey hash for the writer.
 ``` Bash
 writerPubKeyHash=$(cardano-cli stake-address key-hash \
   --stake-verification-key-file writeStake.vkey)
 ```
 
-### Export the Options validator script.
+#### Export the Options validator script.
 ``` Bash
 cardano-options export-script options-script \
   --out-file options.plutus
 ```
 
-### Export the beacon policy script for that trading pair.
+#### Export the beacon policy script for that trading pair.
 ``` Bash
 cardano-options export-script beacon-policy \
   --current-asset-is-lovelace \
@@ -792,31 +792,31 @@ cardano-options export-script beacon-policy \
   --out-file beacons.plutus
 ```
 
-### Calculate the beacon policy id.
+#### Calculate the beacon policy id.
 ``` Bash
 beaconPolicyId=$(cardano-cli transaction policyid \
   --script-file beacons.plutus) 
 ```
 
-### Create the burning redeemer.
+#### Create the burning redeemer.
 ``` Bash
 cardano-options beacon-redeemer burn-beacons \
   --out-file burn.json
 ```
 
-### Create the spending redeemer.
+#### Create the spending redeemer.
 ``` Bash
 cardano-options options-redeemer close-expired-contract \
   --out-file closeExpired.json
 ```
 
-### Create helper beacon variables.
+#### Create helper beacon variables.
 ``` Bash
 activeBeacon="${beaconPolicyId}.416374697665"
 contractIDBeacon="${beaconPolicyId}.<contract_id_to_execute>"
 ```
 
-### Create and submit the transaction.
+#### Create and submit the transaction.
 ``` Bash
 cardano-cli query protocol-parameters \
   --testnet-magic 1 \
@@ -853,13 +853,13 @@ cardano-cli transaction submit \
 ---
 ## Update payment address in an active contract.
 
-### Export the Options validator script.
+#### Export the Options validator script.
 ``` Bash
 cardano-options export-script options-script \
   --out-file options.plutus
 ```
 
-### Export the beacon policy script for that trading pair.
+#### Export the beacon policy script for that trading pair.
 ``` Bash
 cardano-options export-script beacon-policy \
   --current-asset-is-lovelace \
@@ -868,19 +868,19 @@ cardano-options export-script beacon-policy \
   --out-file beacons.plutus
 ```
 
-### Calculate the beacon policy id.
+#### Calculate the beacon policy id.
 ``` Bash
 beaconPolicyId=$(cardano-cli transaction policyid \
   --script-file beacons.plutus) 
 ```
 
-### Create helper beacon variables.
+#### Create helper beacon variables.
 ``` Bash
 activeBeacon="${beaconPolicyId}.416374697665"
 contractIDBeacon="${beaconPolicyId}.<contract_id_of_contract_to_update>"
 ```
 
-### Create the new ActiveDatum.
+#### Create the new ActiveDatum.
 ``` Bash
 cardano-options options-datum active-datum \
   --beacon-policy-id $beaconPolicyId \
@@ -899,7 +899,7 @@ cardano-options options-datum active-datum \
   --out-file updatedDatum.json
 ```
 
-### Create the spending redeemer.
+#### Create the spending redeemer.
 ``` Bash
 cardano-options options-redeemer update-address \
   --payment-pubkey-hash "fe90abc294e5f876d44f9b39583f2e6d905322c4735e3bda2928342f" \
@@ -909,7 +909,7 @@ cardano-options options-redeemer update-address \
 
 The address in the redeemer must match the address in the datum or else the transaction will fail.
 
-### Create and submit the transaction.
+#### Create and submit the transaction.
 ```Bash
 cardano-cli query protocol-parameters \
   --testnet-magic 1 \
@@ -945,7 +945,7 @@ cardano-cli transaction submit \
 ---
 ## Burn a ContractID
 
-### Export the beacon policy script for that trading pair.
+#### Export the beacon policy script for that trading pair.
 ``` Bash
 cardano-options export-script beacon-policy \
   --current-asset-is-lovelace \
@@ -954,24 +954,24 @@ cardano-options export-script beacon-policy \
   --out-file beacons.plutus
 ```
 
-### Calculate the beacon policy id.
+#### Calculate the beacon policy id.
 ``` Bash
 beaconPolicyId=$(cardano-cli transaction policyid \
   --script-file beacons.plutus) 
 ```
 
-### Create the burning redeemer.
+#### Create the burning redeemer.
 ``` Bash
 cardano-options beacon-redeemer burn-beacons \
   --out-file burn.json
 ```
 
-### Create a helper beacon variable.
+#### Create a helper beacon variable.
 ``` Bash
 contractIDBeacon="${beaconPolicyId}.<contract_id_to_burn>"
 ```
 
-### Create and submit the transaction.
+#### Create and submit the transaction.
 ``` Bash
 cardano-cli query protocol-parameters \
   --testnet-magic 1 \
@@ -1004,7 +1004,7 @@ cardano-cli transaction submit \
 
 To see all queries supported, executed `cardano-options query --help`. Below are example responses from the queries.
 
-### Available Contracts
+#### Available Contracts
 ``` JSON
 [
   {
@@ -1099,7 +1099,7 @@ To see all queries supported, executed `cardano-options query --help`. Below are
 
 Only one available contract was found for this trading pair. It contains the Asset UTxO and a list of Proposed UTxOs that could be paired with it. This has all the necessary information for purchasing this contract from the writer. The `info` field is the datum for that UTxO.
 
-### Own Assets UTxOs
+#### Own Assets UTxOs
 ``` JSON
 [
   {
@@ -1127,7 +1127,7 @@ Only one available contract was found for this trading pair. It contains the Ass
 
 This user only has one Asset UTxO at their address. The `info` field is the datum.
 
-### Own Proposals
+#### Own Proposals
 ``` JSON
 [
   {
@@ -1197,7 +1197,7 @@ This user only has one Asset UTxO at their address. The `info` field is the datu
 
 This user has two Proposed UTxOs at their address. The `info` field has the datum for that UTxO.
 
-### Own Active UTxOs
+#### Own Active UTxOs
 ``` JSON
 [
   {
@@ -1241,7 +1241,7 @@ This user has two Proposed UTxOs at their address. The `info` field has the datu
 
 This user currently has only one Active contract at their options address. The `info` field is the datum.
 
-### Specific Contract Info
+#### Specific Contract Info
 ``` JSON
 [
   {
@@ -1285,7 +1285,7 @@ This user currently has only one Active contract at their options address. The `
 
 The information for the target contract was returned. The `info` field is the datum.
 
-### Own Contracts
+#### Own Contracts
 Looking from the perspective of the user with the contractID key.
 
 ``` JSON

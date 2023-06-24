@@ -228,8 +228,8 @@ The `network_tag` of 0 corresponds to the Preproduction testnet (1 would be Main
 
 #### Calculate the staking pubkey hash for the writer.
 ``` Bash
-writerPubKeyHash=$(cardano-cli stake-address key-hash \
-  --stake-verification-key-file writeStake.vkey)
+writerStakePubKeyHash=$(cardano-cli stake-address key-hash \
+  --stake-verification-key-file writerStake.vkey)
 ```
 
 #### Export the Options validator script.
@@ -242,7 +242,7 @@ cardano-options export-script options-script \
 ``` Bash
 cardano-cli address build \
   --payment-script-file options.plutus \
-  --stake-verification-key-file writeStake.vkey \
+  --stake-verification-key-file writerStake.vkey \
   --testnet-magic 1 \
   --out-file writerOption.addr
 ```
@@ -296,8 +296,8 @@ cardano-cli transaction build \
   --mint "1 ${assetsBeacon}" \
   --mint-script-file beacons.plutus \
   --mint-redeemer-file mintAsset.json \
-  --required-signer-hash $writerPubKeyHash \
-  --change-address "$(cat <personal_address>)" \
+  --required-signer-hash $writerStakePubKeyHash \
+  --change-address <personal_address> \
   --tx-in-collateral <collateral_utxo_from_personal_address> \
   --testnet-magic 1 \
   --protocol-params-file protocol.json \
@@ -322,8 +322,8 @@ It is possible to close multiple Asset UTxOs in a single transaction.
 
 #### Calculate the staking pubkey hash for the writer.
 ``` Bash
-writerPubKeyHash=$(cardano-cli stake-address key-hash \
-  --stake-verification-key-file writeStake.vkey)
+writerStakePubKeyHash=$(cardano-cli stake-address key-hash \
+  --stake-verification-key-file writerStake.vkey)
 ```
 
 #### Export the Options validator script.
@@ -378,8 +378,8 @@ cardano-cli transaction build \
   --mint "-1 ${assetsBeacon}" \
   --mint-script-file beacons.plutus \
   --mint-redeemer-file burn.json \
-  --required-signer-hash $writerPubKeyHash \
-  --change-address "$(cat <personal_address>)" \
+  --required-signer-hash $writerStakePubKeyHash \
+  --change-address <personal_address> \
   --tx-in-collateral <collateral_utxo_from_personal_address> \
   --testnet-magic 1 \
   --protocol-params-file protocol.json \
@@ -388,7 +388,7 @@ cardano-cli transaction build \
 cardano-cli transaction sign \
   --tx-body-file tx.body \
   --signing-key-file writerPayment.skey \
-  --signing-key-file writeStake.skey \
+  --signing-key-file writerStake.skey \
   --testnet-magic 1 \
   --out-file tx.signed
 
@@ -402,8 +402,8 @@ cardano-cli transaction submit \
 
 #### Calculate the staking pubkey hash for the writer.
 ``` Bash
-writerPubKeyHash=$(cardano-cli stake-address key-hash \
-  --stake-verification-key-file writeStake.vkey)
+writerStakePubKeyHash=$(cardano-cli stake-address key-hash \
+  --stake-verification-key-file writerStake.vkey)
 ```
 
 #### Export the Options validator script.
@@ -448,7 +448,7 @@ cardano-options options-datum proposal-datum \
   --desired-asset-token-name 4f74686572546f6b656e0a \
   --strike-price-numerator 1 \
   --strike-price-denominator 1000000 \
-  --payment-pubkey-hash "$(cat writerPersonal.pkh)" \
+  --payment-pubkey-hash "$(cat writerPayment.pkh)" \
   --premium-asset-is-lovelace \
   --premium 2000000 \
   --expiration 26668590 \
@@ -470,8 +470,8 @@ cardano-cli transaction build \
   --mint "1 ${proposedBeacon}" \
   --mint-script-file beacons.plutus \
   --mint-redeemer-file mintProposed.json \
-  --required-signer-hash $writerPubKeyHash \
-  --change-address "$(cat writerPersonal.addr)" \
+  --required-signer-hash $writerStakePubKeyHash \
+  --change-address <personal_address> \
   --tx-in-collateral <collateral_utxo> \
   --testnet-magic 1 \
   --protocol-params-file protocol.json \
@@ -494,8 +494,8 @@ cardano-cli transaction submit \
 
 #### Calculate the staking pubkey hash for the writer.
 ``` Bash
-writerPubKeyHash=$(cardano-cli stake-address key-hash \
-  --stake-verification-key-file writeStake.vkey)
+writerStakePubKeyHash=$(cardano-cli stake-address key-hash \
+  --stake-verification-key-file writerStake.vkey)
 ```
 
 #### Export the Options validator script.
@@ -550,8 +550,8 @@ cardano-cli transaction build \
   --mint "-1 ${proposedBeacon}" \
   --mint-script-file beacons.plutus \
   --mint-redeemer-file burn.json \
-  --required-signer-hash $writerPubKeyHash \
-  --change-address "$(cat <personal_address>)" \
+  --required-signer-hash $writerStakePubKeyHash \
+  --change-address <personal_address> \
   --tx-in-collateral <collateral_utxo_from_personal_address> \
   --testnet-magic 1 \
   --protocol-params-file protocol.json \
@@ -560,7 +560,7 @@ cardano-cli transaction build \
 cardano-cli transaction sign \
   --tx-body-file tx.body \
   --signing-key-file writerPayment.skey \
-  --signing-key-file writeStake.skey \
+  --signing-key-file writerStake.skey \
   --testnet-magic 1 \
   --out-file tx.signed
 
@@ -621,7 +621,7 @@ cardano-options options-datum active-datum \
   --desired-asset-token-name 4f74686572546f6b656e0a \
   --strike-price-numerator 1 \
   --strike-price-denominator 1000000 \
-  --payment-pubkey-hash "fe90abc294e5f876d44f9b39583f2e6d905322c4735e3bda2928342f" \
+  --payment-pubkey-hash <payment_pubkey_hash_from_proposed_datum> \
   --premium-asset-is-lovelace \
   --premium 2000000 \
   --expiration 28654389 \
@@ -640,7 +640,7 @@ cardano-options options-redeemer purchase-contract \
 #### Create the target address for the premium payment (from the proposed datum).
 ``` Bash
 premiumAddr=$(cardano-options convert-address \
-  --payment-pubkey-hash "fe90abc294e5f876d44f9b39583f2e6d905322c4735e3bda2928342f" \
+  --payment-pubkey-hash <payment_pubkey_hash_from_proposed_datum> \
   --stdout)
 ```
 
@@ -661,13 +661,13 @@ cardano-cli transaction build \
   --tx-in-inline-datum-present \
   --tx-in-redeemer-file purchase.json \
   --tx-out "<options_address> + 15000000 lovelace + 1 ${activeBeacon} + 1 ${contractIDBeacon}" \
-  --tx-out-inline-datum-file $acceptDatumFile \
+  --tx-out-inline-datum-file activeDatum.json \
   --tx-out "${premiumAddr} + 5000000 lovelace" \
   --tx-out "$(cat buyer.addr) + 2000000 lovelace + 1 ${contractIDBeacon}" \
   --mint "-1 ${assetsBeacon} + -1 ${proposedBeacon} + 1 ${activeBeacon} + 2 ${contractIDBeacon}" \
   --mint-script-file beacons.plutus \
   --mint-redeemer-file mintActive.json \
-  --change-address "$(cat buyer.addr)" \
+  --change-address <buyer_addr> \
   --tx-in-collateral <collateral_utxo_from_buyer> \
   --testnet-magic 1 \
   --protocol-params-file protocol.json \
@@ -741,7 +741,7 @@ cardano-cli query protocol-parameters \
   --out-file protocol.json
 
 cardano-cli transaction build \
-  --tx-in <contract_owner_utxo_with_fee_and_asset_to_swap> \
+  --tx-in <key_owner_utxo_with_fee_and_contract_key_and_asset_to_swap> \
   --tx-in <active_utxo_for_target_contract> \
   --tx-in-script-file options.plutus \
   --tx-in-inline-datum-present \
@@ -750,16 +750,16 @@ cardano-cli transaction build \
   --mint "-1 ${activeBeacon} + -1 ${contractIDBeacon}" \
   --mint-script-file beacons.plutus \
   --mint-redeemer-file burn.json \
-  --change-address "$(cat contractOwner.addr)" \
-  --tx-in-collateral <collateral_utxo_from_contract_owner> \
-  --invalid-hereafter 28654389 \
+  --change-address <key_owner_addr> \
+  --tx-in-collateral <collateral_utxo_from_key_owner> \
+  --invalid-hereafter <expiration_slot_from_datum> \
   --testnet-magic 1 \
   --protocol-params-file protocol.json \
   --out-file tx.body
 
 cardano-cli transaction sign \
   --tx-body-file tx.body \
-  --signing-key-file contractOwner.skey \
+  --signing-key-file keyOwner.skey \
   --testnet-magic 1 \
   --out-file tx.signed
 
@@ -773,8 +773,8 @@ cardano-cli transaction submit \
 
 #### Calculate the staking pubkey hash for the writer.
 ``` Bash
-writerPubKeyHash=$(cardano-cli stake-address key-hash \
-  --stake-verification-key-file writeStake.vkey)
+writerStakePubKeyHash=$(cardano-cli stake-address key-hash \
+  --stake-verification-key-file writerStake.vkey)
 ```
 
 #### Export the Options validator script.
@@ -830,8 +830,8 @@ cardano-cli transaction build \
   --mint "-1 ${activeBeacon} + -1 ${contractIDBeacon}" \
   --mint-script-file beacons.plutus \
   --mint-redeemer-file burn.json \
-  --required-signer-hash $writerPubKeyHash \
-  --change-address "$(cat writerPersonal.addr)" \
+  --required-signer-hash $writerStakePubKeyHash \
+  --change-address <personal_addr> \
   --tx-in-collateral <collateral_utxo> \
   --invalid-before <contract_expiration_plus_one> \
   --testnet-magic 1 \
@@ -923,9 +923,9 @@ cardano-cli transaction build \
   --tx-in-redeemer-file updateAddress.json \
   --tx-out "<options_address> + 15000000 lovelace + 1 ${activeBeacon} + 1 ${contractIDBeacon}" \
   --tx-out-inline-datum-file updatedDatum.json \
-  --change-address "$(cat writerPersonal.addr)" \
+  --change-address <personal_addr> \
   --tx-in-collateral <collateral_utxo> \
-  --required-signer-hash $writerPubKeyHash \
+  --required-signer-hash $writerStakePubKeyHash \
   --testnet-magic 1 \
   --protocol-params-file protocol.json \
   --out-file tx.body
@@ -933,7 +933,7 @@ cardano-cli transaction build \
 cardano-cli transaction sign \
   --tx-body-file tx.body \
   --signing-key-file writerPayment.skey \
-  --signing-key-file writeStake.skey \
+  --signing-key-file writerStake.skey \
   --testnet-magic 1 \
   --out-file tx.signed
 
@@ -978,11 +978,11 @@ cardano-cli query protocol-parameters \
   --out-file protocol.json
 
 cardano-cli transaction build \
-  --tx-in <utxo_wit_id_and_fee> \
+  --tx-in <utxo_with_id_and_fee> \
   --mint "-1 ${contractIDBeacon}" \
   --mint-script-file beacons.plutus \
   --mint-redeemer-file burn.json \
-  --change-address "$(cat owner.addr)" \
+  --change-address <personal_addr> \
   --tx-in-collateral <collateral_utxo> \
   --testnet-magic 1 \
   --protocol-params-file protocol.json \
@@ -1283,10 +1283,10 @@ This user currently has only one Active contract at their options address. The `
 ]
 ```
 
-The information for the target contract was returned. The `info` field is the datum.
+The information for the target Contract ID was returned. The `info` field is the datum.
 
 #### Own Contracts
-Looking from the perspective of the user with the contractID key.
+Looking from the perspective of the user with the Contract ID key.
 
 ``` JSON
 [
@@ -1296,3 +1296,5 @@ Looking from the perspective of the user with the contractID key.
   }
 ]
 ```
+
+This user only has one Contract ID.

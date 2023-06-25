@@ -334,8 +334,6 @@ Currently, multiple options cannot be bought in a single transaction. This was d
 ### Underlying Assets & Proposal Consolidation
 Currently, it takes one transaction to prepare the underlying "Assets For Contract" UTxO, and another transaction to write contract proposal UTxOs against the underlying. This may be consolidated into one transaction, where the underlying and the proposals are output simultaneously. This would lower fees and increase throughput of the protocol.
 
-Furthermore, when a contract is bought, there may be leftover Proposal UTxOs if the writer made multiple proposals against the underlying. Currently, these must be reclaimed in a separate TX, but future versions of Cardano-Options may incorporate reclamation of Proposal UTxOs into the Buy-Option transaction.
-
 ### Expired Option Rollovers
 Most option writers are in the business of writing options regularly, and will often "rollover" expired options into new offers. Currently, this takes two transactions (one for reclaiming an expired option, and another to prepare a new asset UTxO). With the addition of a new redeemer, it may be possible to consolidate this rollover into a single transaction. This would lower fees and increase throughput of the protocol.
 

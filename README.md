@@ -286,7 +286,7 @@ A discussion of features unique to Cardano-Options.
 ### Trade-able Options Contracts
 Querying the location and the right to exercise an (unexpired) option is fully encapsulated in the `ContractID` "Key" Beacon Token. These tokens can be traded on a secondary market, just like in traditional options markets. With enough liquidity, option buyers may buy options speculatively, with confidence they'd be able to sell them to a market maker (instead of having to exercise it themselves).
 
-[Secondary Market Stuff]
+[cardano-secondary-market](https://github.com/fallen-icarus/cardano-secondary-market) is one such protocol specifically designed for trading Key Beacon tokens for any protocol using Lock and Key Beacon NFTs.
 
 ### Staking Script Credentials
 Since owner-related actions of script addresses are overloaded to the staking credentials, users can secure their addresses either with a simple stake key or a more complex stake script (Native or Plutus). In the case of simple stake key, a regular signature from the stake key will suffice. In the case of a script however, the staking script must be executed (i.e. withdraw 0 ADA from rewards) in the same TX. This means stake address registration is not necessary when using simple stake keys, but is necessary when using staking scripts.

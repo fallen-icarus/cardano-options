@@ -340,3 +340,6 @@ Most option writers are in the business of writing options regularly, and will o
 
 ## Conclusion
 Cardano-Options is the latest addition to a family of p2p-DeFi protocols that enables users to build a fully endogenous economy on the CSL. By embracing radical permissionlessness, simplicity, and interoperability, Cardano-Options enables a secure, censorship-resistant options market on Cardano.
+
+## Feedback
+Any feedback that can help improve the protocol is welcome! If you have any ideas, feel free to use either the Issue section or Discussion section of this repo. The Discussion section can also be used to ask any questions.

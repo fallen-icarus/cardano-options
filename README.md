@@ -226,8 +226,7 @@ The `MintActiveBeacon` minting redeemer mints one `Active` Beacon and two `Contr
 	- Must contain the same quantity of assets as in the `AssetForContract` UTxO, 1 `Active` Beacon Token, 1 `ContractID` Token, and 5 ADA
 	- The datum fields of the output must exactly match the datum fields of the `ProposedContract` input, plus one extra field: `contractID` - whose value is the Tx hash supplied by the `AcceptContract` Redeemer
 
-The `AcceptContract` Redeemer checks that the `Active`  Beacon Token is minted. This guarantees that the minting policy is executed in the same Tx (which is what enforces the actual logic). Since every such Buy-Option transaction only ever has one `AssetForContract` UTxO as an input, `ContractID` Tokens are guaranteed to have unique Token Names for each contract (they use the `AssetsForContract`'s' Txix as their Token Name).
-
+The `AcceptContract` Redeemer checks that the `Active`  Beacon Token is minted. This guarantees that the minting policy is executed in the same Tx (which is what enforces the actual logic). Since the protocol enforces that every transaction can only ever have one output with an `Assets` beacon, every valid `AssetsForContract` UTxO is cryptographically guaranteed to have a unique transaction hash. By extension, by using this hash as the `ContractID` token name for the newly created contract, every contract is cryptographically guaranteed to have a unique `ContractID` pair.
 
 #### 3. Exercising an Option Contract
 Whoever owns the ContractID "Key" Beacon Token can locate the underlying Active Contract UTxO (which contains the corresponding ContractID "Lock" Token) and exercise the option, until expiry. 

@@ -1,5 +1,5 @@
 # Cardano-Options
-A p2p derivatives protocol for writing, buying, and trading American-style *covered* options contracts on the Cardano Settlement Layer.
+A [p2p-DeFi protocol](https://github.com/zhekson1/CSL-DeFi-Protocols) for writing, buying, and trading American-style *covered* options contracts on the Cardano Settlement Layer.
 
 ## Table of Contents
 - [Abstract](#abstract)
@@ -10,20 +10,19 @@ A p2p derivatives protocol for writing, buying, and trading American-style *cove
 - [Future Directions](#future-directions)
 - [Conclusion](#conclusion)
 
-
 ## Abstract
-Cardano-Options is a fully p2p protocol for writing, buying, and trading American-style *covered* options contracts on the Cardano Settlement Layer (CSL). Users maintain delegation control of assets at all times.
+Cardano-Options is a p2p-DeFi protocol for writing, buying, and trading American-style *covered* options contracts on the Cardano Settlement Layer (CSL). Users maintain delegation control of assets at all times.
 
 ## Motivation
-Options contracts play a vital role in the economy by providing a mechanism for risk management, improving market efficiency, and enhancing price discovery. This is especially important for an endogenous p2p economy that does not rely off-chain price feeds.
+Options contracts play a vital role in the economy by providing a mechanism for risk management, improving market efficiency, and enhancing price discovery. This is especially important for an endogenous p2p economy that does not rely off-chain price feeds. Currently, there are no options markets on Cardano.
 
 ## Preliminary Discussion
 Typically, options are explicitly categorized as either calls or puts. This is not necessary in Cardano-Options, since all assets on Cardano, including stablecoins, are first-class citizens. A call or a put is defined *implicitly*, based on the nature of the underlying "locked" asset. For example, a "put" option for ADA (priced in USD) is created by writing an option to swap ADA against a locked UTxO containing a stablecoin, such as DJED or USDA. For "call" options it would be the opposite - the locked UTxO contains ADA, to be swapped for a stablecoin. 
 
 ### The Cardano-Options Protocol
-Users sell covered options contracts that are redeemable via a tradable NFT. 
+Users buy/sell covered options contracts that are redeemable via a tradable NFT. 
 
-##### The protocol is broadly comprised of three steps:
+##### **The protocol is broadly comprised of three steps:**
 
 1. **Writing Option** - Alice writes a spread of options (in the form of multiple UTxOs with different datums) of varying *expiry dates, premiums, and strike prices*, against a single UTxO containing an asset.
    
@@ -33,7 +32,7 @@ Users sell covered options contracts that are redeemable via a tradable NFT.
 
 
 ## Specification
-The protocol is composed of one validator script and multiple asset-pair specific minting policies that work together. All options, no matter how different the terms, use the same validator script. Minting policies are unique for every asset-pair.
+The protocol is composed of one validator script and multiple minting policies that work together. All options, no matter how different the terms, use the same validator script. Minting policies however, are unique for every asset-pair.
 
 ### Components
 An outline of the addresses, tokens, datums, and redeemers used in Cardano-Options
@@ -42,7 +41,7 @@ An outline of the addresses, tokens, datums, and redeemers used in Cardano-Optio
 The option writer creates an address whose payment credential is that of the Cardano-Options script, and a unique staking credential (key or script). This address will contain UTxOs with assets that cover contracts, as well as UTxOs with proposed contract terms (in the form of datums). Contracts of varying asset-pairs can all be written from this one address. Beacon Tokens with policyIDs unique to each asset-pair are minted in each UTxO, and are used to differentiate asset-pairs during querying. Owner related actions are "overloaded" to the staking credential, and the writer maintains full delegation control over all assets in the address. This includes "Active"/Open contracts - these are locked in the address, but their stake is still under control of the writer. 
 
 #### Option Writer's Payment Address
-The Option writer must specify a regular pubkey address where they will receive premium payments, and full payment if/when the option is exercised. This feature allows the writer to be paid directly, rather than being paid to the options address only to withdraw it to their personal address later. Script addresses cannot be used for this because Plutus currently requires that UTxOs in Plutus-guarded script addresses have attached datums. If a UTxO with the wrong (or no) datum ends up in a Plutus-guarded address, it will be locked forever. The contract exerciser cannot be trusted to output payments with proper datums, and enforcing this via Plutus is too resource-intensive. Therefore, writer's payment addresses are for now limited to simple key-based addresses.
+The Option writer must specify a regular pubkey address where they will payments. Premiums are when the option is bought, and full payment if/when the option is exercised. Script addresses cannot be used for this because Plutus currently requires that UTxOs in Plutus-guarded script addresses have attached datums. If a UTxO with the wrong (or no) datum ends up in a Plutus-guarded address, it will be locked forever. The contract exerciser cannot be trusted to output payments with proper datums, and enforcing this via Plutus is too resource-intensive. Therefore, writer's payment addresses are for now limited to simple key-based addresses.
 
 #### Beacon Tokens
 Cardano-Options uses 5 types of Beacon Tokens. All 5 have the same policy ID (unique for every asset pair), but different Token Names. The two Contract ID tokens have identical Token Names (unique for every contract). In addition to enforcing proper behavior, all of these tokens serve as Beacons:
@@ -115,7 +114,7 @@ data OptionsRedeemer
 | UpdateAddress -- Change the creatorAddress in an active contract
 ```
 
-#### Minting Redeemers
+#### Beacon Minting Redeemers
 Minting redeemers are introduced here, their usage is explained further below.
 
 ```Haskell
@@ -226,7 +225,8 @@ The `MintActiveBeacon` minting redeemer mints one `Active` Beacon and two `Contr
 	- Must contain the same quantity of assets as in the `AssetForContract` UTxO, 1 `Active` Beacon Token, 1 `ContractID` Token, and 5 ADA
 	- The datum fields of the output must exactly match the datum fields of the `ProposedContract` input, plus one extra field: `contractID` - whose value is the Tx hash supplied by the `AcceptContract` Redeemer
 
-The `AcceptContract` Redeemer checks that the `Active`  Beacon Token is minted. This guarantees that the minting policy is executed in the same Tx (which is what enforces the actual logic). Since the protocol enforces that every transaction can only ever have one output with an `Assets` beacon, every valid `AssetsForContract` UTxO is cryptographically guaranteed to have a unique transaction hash. By extension, by using this hash as the `ContractID` token name for the newly created contract, every contract is cryptographically guaranteed to have a unique `ContractID` pair.
+The `AcceptContract` Redeemer checks that the `Active`  Beacon Token is minted. This guarantees that the minting policy is executed in the same Tx (which is what enforces the actual logic). Since the protocol enforces that every transaction can only ever have one output with an `Asset` Beacon, every valid `AssetForContract` UTxO is guaranteed to have a unique TxHash. By using this TxHash as the Token Name of the `ContractID` Beacons, every contract is guaranteed to have a unique `ContractID` pair.
+
 
 #### 3. Exercising an Option Contract
 Whoever owns the ContractID "Key" Beacon Token can locate the underlying Active Contract UTxO (which contains the corresponding ContractID "Lock" Token) and exercise the option, until expiry. 
@@ -286,10 +286,7 @@ A discussion of features unique to Cardano-Options.
 ### Trade-able Options Contracts
 Querying the location and the right to exercise an (unexpired) option is fully encapsulated in the `ContractID` "Key" Beacon Token. These tokens can be traded on a secondary market, just like in traditional options markets. With enough liquidity, option buyers may buy options speculatively, with confidence they'd be able to sell them to a market maker (instead of having to exercise it themselves).
 
-[cardano-secondary-market](https://github.com/fallen-icarus/cardano-secondary-market) is one such protocol specifically designed for trading Key Beacon tokens for any protocol using Lock and Key Beacon NFTs.
-
-### Staking Script Credentials
-Since owner-related actions of script addresses are overloaded to the staking credentials, users can secure their addresses either with a simple stake key or a more complex stake script (Native or Plutus). In the case of simple stake key, a regular signature from the stake key will suffice. In the case of a script however, the staking script must be executed (i.e. withdraw 0 ADA from rewards) in the same TX. This means stake address registration is not necessary when using simple stake keys, but is necessary when using staking scripts.
+Using [Cardano-Secondary-Market](https://github.com/fallen-icarus/cardano-secondary-market), option buyers can do just that. Secondary buyers who buy options on the aftermarket can even exercise their option in the same transaction they bought it. [Click here](https://github.com/fallen-icarus/cardano-secondary-market/blob/main/images/Swap-Market-Option.jpg) for a detailed example of such composition.
 
 ### Interoperability & Composability
 Cardano-Options is fully composable with Cardano-Swaps, down to the TX level. For example, when exercising an option, payment can be an input from a swap that is executed in the same TX. Below is an example where Alice exercises an option to buy 1000 ADA for 500 DJED, where the DJED comes from a USDA:DJED swap address.
@@ -298,7 +295,7 @@ Cardano-Options is fully composable with Cardano-Swaps, down to the TX level. Fo
 
 -------
 
-### Fee Estimations
+### Fee Estimations (YMMV)
 | Transaction Type | Fee Estimation |
 |--|--|
 | Create One Underlying UTxO | 0.628372 ADA |
@@ -317,7 +314,7 @@ Cardano-Options is fully composable with Cardano-Swaps, down to the TX level. Fo
 
 
 ## Future Directions
-Being a PoC, v1 of Cardano-Options is intended to demonstrate the capacity for a fully p2p options market on the CSL. As such, there are a number of features that may be implemented in future version of the protocol, discussed below.
+V1 of Cardano-Options is intended to demonstrate the capacity for a fully p2p options market on the CSL. As such, there are a number of features that may be implemented in future version of the protocol, discussed below.
 
 ### Script-based Payment Addresses
 With further optimizations to Plutus Core, more efficient languages, increased execution limits, or all three, it may be possible to enforce that the option exerciser outputs payments to the writer with proper datums. Alternatively, Plutus Core may be updated such that scripts may be executed even if there is no datum.
@@ -339,7 +336,6 @@ Most option writers are in the business of writing options regularly, and will o
 
 
 ## Conclusion
-Cardano-Options is the latest addition to a family of p2p-DeFi protocols that enables users to build a fully endogenous economy on the CSL. By embracing radical permissionlessness, simplicity, and interoperability, Cardano-Options enables a secure, censorship-resistant options market on Cardano.
+Cardano-Options is the latest member of the [p2p-DeFi protocol family.](https://github.com/zhekson1/CSL-DeFi-Protocols) It enables the formation of a radically permissionless and highly composable options market on the CSL, and works synergistically with other p2p-DeFi protocols. 
 
-## Feedback
-Any feedback that can help improve the protocol is welcome! If you have any ideas, feel free to use either the Issue section or Discussion section of this repo. The Discussion section can also be used to ask any questions.
+Any feedback that can help improve the protocol is welcome! If you have any ideas or questions, please use either the Issue section or Discussion section of this repo.

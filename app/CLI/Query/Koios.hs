@@ -9,7 +9,7 @@
 module CLI.Query.Koios
   ( queryPersonalAddress
   , querySlotTip
-  , queryProposals
+  , queryOptionsUTxOs
   , querySpecificOptionsUTxO
   , submitTx
   , evaluateTx
@@ -20,11 +20,9 @@ import Servant.API
 import Data.Aeson
 import Servant.Client
 import qualified Data.Text as T
-import Data.Maybe (fromJust)
 
 import CardanoOptions
 
-import CLI.Data.Asset
 import CLI.Data.Bech32Address
 import CLI.Data.OptionsUTxO
 import CLI.Data.PersonalUTxO
@@ -118,7 +116,7 @@ type KoiosApi
      :> QueryParam' '[Required] "is_spent" Text
      :> QueryParam "asset_list" Text
      :> ReqBody '[JSON] TargetAsset
-     :> Post '[JSON] [OptionsUTxO]
+     :> Post '[JSON] [Maybe OptionsUTxO]
 
   :<|>  "utxo_info"
      :> QueryParam' '[Required] "select" Text
@@ -173,12 +171,26 @@ querySlotTip = slotTipApi >>= \case
   [(SlotTip t)] -> return t
   _ -> error "slotTipApi error"
 
-queryProposals :: [(CurrencySymbol,TokenName)] -> Maybe PaymentAddress -> ClientM [OptionsUTxO]
-queryProposals [] _ = return []
-queryProposals targetBeacons@(x:xs) mWriterAddr = case mWriterAddr of
+queryOptionsUTxOs :: [(CurrencySymbol,TokenName)] -> Maybe PaymentAddress -> ClientM [OptionsUTxO]
+queryOptionsUTxOs [] Nothing = return []
+queryOptionsUTxOs [] (Just addr) = do
+    writerAddressUTxOsApi select "eq.false" Nothing (ExtendedPaymentAddresses [addr])  
+  where
+    select :: Text
+    select =
+      toText $ intercalate ","
+        [ "is_spent"
+        , "tx_hash"
+        , "tx_index"
+        , "address"
+        , "value"
+        , "inline_datum"
+        , "asset_list"
+        ]
+queryOptionsUTxOs targetBeacons@(x:xs) mWriterAddr = case mWriterAddr of
     Nothing -> do
       let assetFilter = Just $ assetToQueryParam xs
-      optionsUTxOsApi select "eq.false" assetFilter (TargetAsset x)
+      catMaybes <$> optionsUTxOsApi select "eq.false" assetFilter (TargetAsset x)
     Just addr -> do
       let assetFilter = Just $ assetToQueryParam targetBeacons
       writerAddressUTxOsApi select "eq.false" assetFilter (ExtendedPaymentAddresses [addr])  

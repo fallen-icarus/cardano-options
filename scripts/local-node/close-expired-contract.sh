@@ -6,34 +6,40 @@ walletDir="${mainDir}wallets/"
 optionsDir="${mainDir}options-files/"
 tmpDir="${mainDir}tmp/"
 
+activeBeaconRedeemerFile="${optionsDir}purchaseExecuteOrCloseExpired.json"
+optionsRedeemerFile="${optionsDir}closeExpired.json"
+
 writerStakePubKeyFile="${walletDir}01Stake.vkey"
 
-beaconRedeemerFile="${optionsDir}createCloseOrUpdateProposal.json"
-optionsRedeemerFile="${optionsDir}closeOrUpdateProposal.json"
-
-premiumAsset='lovelace'
 offerAsset='c0f8644a01a6bf5db02f4afe30d604975e63dd274f1098a1738e561d.4f74686572546f6b656e0a'
 askAsset='c0f8644a01a6bf5db02f4afe30d604975e63dd274f1098a1738e561d.54657374546f6b656e31'
+
+expiration=1714744278000 # in posix
+contractUTxO="1e8ba02a6e6fb5a151777c6efe8139b1a0f823bb70ec46efdebeb3778a129869#0"
+contractIdName="127f33c969bff4e22750572ae2d512d33013954b01f471e291443931823c66b1"
+
+## Convert the expiration to the associated slot number for use as invalid-before.
+expirationSlot=$(cardano-options convert-time --posix-time $expiration --testnet)
 
 ## Generate the hash for the staking verification key.
 echo "Calculating the staking pubkey hash for the writer..."
 writerStakePubKeyHash=$(cardano-cli stake-address key-hash \
   --stake-verification-key-file $writerStakePubKeyFile)
 
-## Create the required redeemers.
-echo "Creating the proposal beacon redeemer..."
-cardano-options redeemers proposal-script manage-proposals \
-  --out-file $beaconRedeemerFile
-
-echo "Creating the spending redeemer..."
-cardano-options redeemers options-script manage-proposal \
-  --out-file $optionsRedeemerFile
-
-## Get the proposal beacon policy id.
-echo "Calculating the proposal beacon policy id..."
-beaconPolicyId=$(cardano-options beacon-name policy-id \
-  --proposal-beacons \
+## Get the active beacon policy id.
+echo "Calculating the active beacon policy id..."
+activeBeaconPolicyId=$(cardano-options beacon-name policy-id \
+  --active-beacons \
   --stdout) 
+
+## Create the required redeemers.
+echo "Creating the active beacon redeemer..."
+cardano-options redeemers active-script main \
+  --out-file $activeBeaconRedeemerFile
+
+echo "Creating the options spending redeemer..."
+cardano-options redeemers options-script close-expired \
+  --out-file $optionsRedeemerFile
 
 ## Get the required beacon names.
 offerBeaconName=$(cardano-options beacon-name asset-name offer-beacon \
@@ -42,37 +48,33 @@ offerBeaconName=$(cardano-options beacon-name asset-name offer-beacon \
 askBeaconName=$(cardano-options beacon-name asset-name ask-beacon \
   --ask-asset $askAsset \
   --stdout)
-premiumBeaconName=$(cardano-options beacon-name asset-name premium-beacon \
-  --premium-asset $premiumAsset \
-  --stdout)
 pairBeaconName=$(cardano-options beacon-name asset-name trading-pair-beacon \
   --offer-asset $offerAsset \
   --ask-asset $askAsset \
   --stdout)
 
-offerBeacon="${beaconPolicyId}.${offerBeaconName}"
-askBeacon="${beaconPolicyId}.${askBeaconName}"
-premiumBeacon="${beaconPolicyId}.${premiumBeaconName}"
-pairBeacon="${beaconPolicyId}.${pairBeaconName}"
-
+activeOfferBeacon="${activeBeaconPolicyId}.${offerBeaconName}"
+activeAskBeacon="${activeBeaconPolicyId}.${askBeaconName}"
+activePairBeacon="${activeBeaconPolicyId}.${pairBeaconName}"
+activeContractId="${activeBeaconPolicyId}.${contractIdName}"
 
 ## Create and submit the transaction.
 cardano-cli transaction build \
-  --tx-in 79a30b0dd58d8bda1d6f2202dfc5112e4d981dbdf6ad24294f1cd7da03ba6332#2 \
+  --tx-in $contractUTxO \
   --spending-tx-in-reference 9c23472cb2e7787861618c91f7a7a28df71d04bc69176c4c79e656ccc8ccedb1#0 \
   --spending-plutus-script-v2 \
   --spending-reference-tx-in-inline-datum-present \
   --spending-reference-tx-in-redeemer-file $optionsRedeemerFile \
-  --tx-out "$(cat ${walletDir}01.addr) + 2000000 lovelace + 10 ${offerAsset}" \
-  --mint "-1 ${askBeacon} + -1 ${offerBeacon} + -1 ${pairBeacon} + -1 ${premiumBeacon}" \
-  --mint-tx-in-reference a1797d0186118d658ca66156c4ecd669073ec79282e65cbbda19d2ada41ebe71#0 \
+  --mint "-1 ${activeOfferBeacon} + -1 ${activeAskBeacon} + -1 ${activePairBeacon} + -1 ${activeContractId}" \
+  --mint-tx-in-reference 04f467c798753dd43761f4eb7a70a2fa1e07977d198079e9fc364834c535afe3#0 \
   --mint-plutus-script-v2 \
-  --mint-reference-tx-in-redeemer-file $beaconRedeemerFile \
-  --policy-id $beaconPolicyId \
+  --mint-reference-tx-in-redeemer-file $activeBeaconRedeemerFile \
+  --policy-id $activeBeaconPolicyId \
   --required-signer-hash $writerStakePubKeyHash \
   --change-address "$(cat ${walletDir}01.addr)" \
   --tx-in-collateral 4cc5755712fee56feabad637acf741bc8c36dda5f3d6695ac6487a77c4a92d76#0 \
   --testnet-magic 1 \
+  --invalid-before $expirationSlot \
   --out-file "${tmpDir}tx.body"
 
 cardano-cli transaction sign \

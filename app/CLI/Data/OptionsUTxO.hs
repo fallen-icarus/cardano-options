@@ -46,7 +46,8 @@ instance FromJSON OptionsUTxO where
                   maybe mzero return . rightToMaybe . readTxOutRef)
           <*> o .: "value"
           <*> o .: "asset_list"
-          <*> (o .: "inline_datum" >>= withObject "inlineDatum" (.: "value") >>= return . parseDatum)
+          <*> (o .:? "inline_datum" >>= 
+                maybe (return Nothing) (\i -> withObject "inlineDatum" (.: "value") i >>= return . parseDatum))
     where
       concatRef :: String -> Integer -> String
       concatRef hash idx = hash <> "#" <> show idx

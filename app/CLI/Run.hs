@@ -18,6 +18,7 @@ import Optics.Operators
 
 import CardanoOptions
 
+import CLI.Data.Bech32Address
 import CLI.Data.Commands
 import CLI.Data.Network
 import CLI.Data.OptionsUTxO
@@ -152,9 +153,42 @@ runQuery query = case query of
         assets
           | isJust pairBeacon = catMaybes [pairBeacon,premiumBeacon]
           | otherwise = catMaybes [askBeacon,offerBeacon,premiumBeacon]
-    case assets of
-      [] -> print @Text "At least one beacon filter must be specified."
-      _ -> runQueryProposals network api assets mWriterAddr >>= case format of
+    case (mWriterAddr,assets) of
+      (Nothing,[]) -> 
+        print @Text "At least one beacon filter must be specified or a writer address must be specified."
+      _ -> runQueryOptionsUTxOs network api assets mWriterAddr >>= case format of
+        JSON -> toJSONOutput output
+        Pretty -> toPrettyOutput output . (<> hardline) . vsep . map (prettyOptionsUTxO network)
+        Plain -> toPlainOutput output . (<> hardline) . vsep . map (prettyOptionsUTxO network)
+  QueryActives network api mOfferAsset mAskAsset mContractId mWriterAddr format output -> do
+    let askBeacon = 
+          ((activeBeaconCurrencySymbol,) . unAskBeacon . genAskBeaconName)
+            <$> mAskAsset
+        offerBeacon = 
+          ((activeBeaconCurrencySymbol,) . unOfferBeacon . genOfferBeaconName)
+            <$> mOfferAsset
+        contractIdBeacon = 
+          ((activeBeaconCurrencySymbol,) . unContractId)
+            <$> mContractId
+        pairBeacon = fmap ((activeBeaconCurrencySymbol,) . unTradingPairBeacon) 
+                   . genTradingPairBeaconName <$> mOfferAsset <*> mAskAsset
+        assets
+          | isJust pairBeacon = catMaybes [pairBeacon,contractIdBeacon]
+          | otherwise = catMaybes [askBeacon,offerBeacon,contractIdBeacon]
+    case (mWriterAddr,assets) of
+      (Nothing,[]) -> 
+        print @Text "At least one beacon filter must be specified or a writer address must be specified."
+      (Nothing,_) -> do
+        rawResult <- runQueryOptionsUTxOs network api assets mWriterAddr
+        let result
+              | catMaybes [offerBeacon,askBeacon] == [] = flip filter rawResult $
+                  \OptionsUTxO{optionsAddress} -> fromRight False $ isOptionsAddress optionsAddress
+              | otherwise = rawResult
+        case format of
+          JSON -> toJSONOutput output result
+          Pretty -> toPrettyOutput output $ (<> hardline) $ vsep $ map (prettyOptionsUTxO network) result
+          Plain -> toPlainOutput output $ (<> hardline) $ vsep $ map (prettyOptionsUTxO network) result
+      _ -> runQueryOptionsUTxOs network api assets mWriterAddr >>= case format of
         JSON -> toJSONOutput output
         Pretty -> toPrettyOutput output . (<> hardline) . vsep . map (prettyOptionsUTxO network)
         Plain -> toPlainOutput output . (<> hardline) . vsep . map (prettyOptionsUTxO network)

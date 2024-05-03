@@ -1,6 +1,6 @@
 cabal-version:      2.4
 name:               cardano-options
-version:            0.1.0.0
+version:            1.0.0.0
 
 synopsis: A distributed Cardano P2P Options Trading protocol.
 license: Apache-2.0
@@ -83,6 +83,7 @@ test-suite cardano-options-tests
     , Test.ActiveUTxOs.UpdatePaymentAddress.Benchmarks
     , Test.ActiveUTxOs.UpdatePaymentAddress.Failures
     , Test.ActiveUTxOs.UpdatePaymentAddress.Regressions
+    , Test.Beacons
     , Test.Misc
     , Test.Prelude
     , Test.ProposalUTxOs

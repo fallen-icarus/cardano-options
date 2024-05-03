@@ -4,7 +4,7 @@
 module CLI.Query
   ( runQuerySlotTip
   , runQueryPersonalAddress
-  , runQueryProposals
+  , runQueryOptionsUTxOs
   , runQuerySpecificOptionsUTxO
   , runSubmitTx
   , runEvaluateTx
@@ -50,21 +50,21 @@ runQueryPersonalAddress network api addr keysOnly = do
       let env = mkClientEnv manager' (BaseUrl Https "api.koios.rest" 443 "api/v1")
       runClientM (Koios.queryPersonalAddress addr keysOnly) env
 
-runQueryProposals 
+runQueryOptionsUTxOs 
   :: Network 
   -> ApiService
   -> [(CurrencySymbol,TokenName)]
   -> Maybe PaymentAddress 
   -> IO [OptionsUTxO]
-runQueryProposals network api targetBeacons mWriterAddr = do
+runQueryOptionsUTxOs network api targetBeacons mWriterAddr = do
   manager' <- newManager tlsManagerSettings
   either throw return =<< case (network,api) of
     (PreProdTestnet,Koios) -> do
       let env = mkClientEnv manager' (BaseUrl Https "preprod.koios.rest" 443 "api/v1")
-      runClientM (Koios.queryProposals targetBeacons mWriterAddr) env
+      runClientM (Koios.queryOptionsUTxOs targetBeacons mWriterAddr) env
     (Mainnet,Koios) -> do
       let env = mkClientEnv manager' (BaseUrl Https "api.koios.rest" 443 "api/v1")
-      runClientM (Koios.queryProposals targetBeacons mWriterAddr) env
+      runClientM (Koios.queryOptionsUTxOs targetBeacons mWriterAddr) env
 
 runQuerySpecificOptionsUTxO :: Network -> ApiService -> TxOutRef -> IO [OptionsUTxO]
 runQuerySpecificOptionsUTxO network api outRef = do

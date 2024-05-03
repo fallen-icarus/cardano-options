@@ -61,7 +61,7 @@ data Query
   = QueryPersonal Network ApiService PaymentAddress Bool Format Output
   -- | Query the latest slot number.
   | QueryCurrentSlot Network ApiService
-  -- | Query all open Proposal UTxOs. You must filter by at least one beacon, and you can optionally
+  -- | Query all Proposal UTxOs. You must filter by at least one beacon, and you can optionally
   -- filter by writer address.
   | QueryProposals 
       Network 
@@ -69,5 +69,15 @@ data Query
       (Maybe OfferAsset) 
       (Maybe AskAsset) 
       (Maybe PremiumAsset) 
+      (Maybe PaymentAddress) 
+      Format Output
+  -- | Query all Active UTxOs. You must filter by at least one beacon, and you can optionally
+  -- filter by writer address.
+  | QueryActives
+      Network 
+      ApiService 
+      (Maybe OfferAsset) 
+      (Maybe AskAsset) 
+      (Maybe ContractId) 
       (Maybe PaymentAddress) 
       Format Output

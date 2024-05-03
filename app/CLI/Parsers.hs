@@ -5,7 +5,6 @@ module CLI.Parsers
 
 import Options.Applicative
 import Relude
-import qualified Data.String as String
 
 import CardanoOptions
 
@@ -481,6 +480,8 @@ parseQuery = fmap Query . hsubparser $ mconcat
       info pQueryPersonal $ progDesc "Query your personal address." 
   , command "proposals" $
       info pQueryProposals $ progDesc "Query open proposals for the protocol." 
+  , command "actives" $
+      info pQueryActives $ progDesc "Query active contracts for the protocol." 
   , command "current-slot" $
       info pQueryCurrentSlot $ progDesc "Query the current slot number."
   ]
@@ -515,6 +516,18 @@ pQueryProposals =
     <*> ((Just <$> pOfferAsset) <|> pure Nothing)
     <*> ((Just <$> pAskAsset) <|> pure Nothing)
     <*> ((Just <$> pPremiumAsset) <|> pure Nothing)
+    <*> ((Just <$> pBech32Address) <|> pure Nothing)
+    <*> pFormat
+    <*> pOutput
+
+pQueryActives :: Parser Query
+pQueryActives =
+  QueryActives
+    <$> pNetwork
+    <*> pApiService
+    <*> ((Just <$> pOfferAsset) <|> pure Nothing)
+    <*> ((Just <$> pAskAsset) <|> pure Nothing)
+    <*> ((Just <$> pContractId) <|> pure Nothing)
     <*> ((Just <$> pBech32Address) <|> pure Nothing)
     <*> pFormat
     <*> pOutput

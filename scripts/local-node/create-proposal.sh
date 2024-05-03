@@ -22,11 +22,11 @@ contractDeposit=5000000 # 5 ADA
 currentSlot=$(cardano-options query current-slot --testnet)
 
 ## The first expiration will be 1000 slots from now.
-expirationSlot1=$(($currentSlot + 1000))
+expirationSlot1=$((currentSlot + 1000))
 expirationTime1=$(cardano-options convert-time --slot $expirationSlot1 --testnet)
 
 ## The second expiration will be 2000 slots from now.
-expirationSlot2=$(($currentSlot + 2000))
+expirationSlot2=$((currentSlot + 2000))
 expirationTime2=$(cardano-options convert-time --slot $expirationSlot2 --testnet)
 
 ## Export the scripts.
@@ -34,11 +34,6 @@ echo "Exporting the scripts..."
 cardano-options scripts \
   --options-script \
   --out-file $optionsScript
-
-## Generate the hash for the staking verification key.
-echo "Calculating the staking pubkey hash for the writer..."
-writerStakePubKeyHash=$(cardano-cli stake-address key-hash \
-  --stake-verification-key-file $writerStakePubKeyFile)
 
 ## Create the options address.
 echo "Creating the writer's options address..."
@@ -99,10 +94,8 @@ pairBeacon="${beaconPolicyId}.${pairBeaconName}"
 ## Create and submit the transaction.
 ## invalid-hereafter should be set to the earliest expiration slot.
 cardano-cli transaction build \
-  --tx-in 9d7b8e4f3ab7fa082f020ae2cc6cf7577ebb2a7cb190b9517a3c8c1f94283a88#0 \
-  --tx-in 78029f8866f0afc6ab4c841ffe3fd863f90e73365a37c7ad8ee92a6a32617e8e#0 \
-  --tx-out "$(cat ${walletDir}01.addr) + 2000000 lovelace + 1 ${offerAsset}" \
-  --tx-out "$(cat ${walletDir}01.addr) + 2000000 lovelace + 9 ${askAsset}" \
+  --tx-in a1797d0186118d658ca66156c4ecd669073ec79282e65cbbda19d2ada41ebe71#1 \
+  --tx-in fe542138caf0ff71bdded4ececbd4206a06d309d508de7fd5e3677f9e44deeda#0 \
   --tx-out "${writerOptionsAddr} + ${contractDeposit} lovelace + 1 ${askBeacon} + 1 ${offerBeacon} + 1 ${premiumBeacon} + 1 ${pairBeacon} + 10 ${offerAsset}" \
   --tx-out-inline-datum-file $proposalDatumFile \
   --mint "1 ${askBeacon} + 1 ${offerBeacon} + 1 ${pairBeacon} + 1 ${premiumBeacon}" \

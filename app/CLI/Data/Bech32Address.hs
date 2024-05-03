@@ -17,9 +17,10 @@ module CLI.Data.Bech32Address
   , paymentAddressToPlutusAddress
   , stakeAddressToPlutusCredential
 
-    -- * Inspecting Bech32 Addresses
+    -- * Inspecting Addresses
   , Address.AddressInfo(..)
   , inspectBech32Address
+  , isOptionsAddress
   ) where
 
 import Relude
@@ -97,7 +98,7 @@ unStakeAddress :: StakeAddress -> Text
 unStakeAddress (StakeAddress addr) = addr
 
 -------------------------------------------------
--- Inspecting Bech32 Addresses
+-- Inspecting Addresses
 -------------------------------------------------
 inspectBech32Address :: Text -> Either Text Address.AddressInfo
 inspectBech32Address addr = do
@@ -110,6 +111,11 @@ inspectBech32Address addr = do
     case inspectInfo of
       Address.InspectAddressShelley info -> Right info
       _ -> Left "Bech32 address is not a shelley address."
+
+isOptionsAddress :: PaymentAddress -> Either Text Bool
+isOptionsAddress addr = do
+  Address{..} <- paymentAddressToPlutusAddress addr
+  return $ addressCredential == ScriptCredential optionsScriptHash
 
 -------------------------------------------------
 -- Parsing Bech32 Addresses

@@ -61,12 +61,12 @@ activeContractId="${activeBeaconPolicyId}.${contractIdName}"
 ## Create and submit the transaction.
 cardano-cli transaction build \
   --tx-in $contractUTxO \
-  --spending-tx-in-reference 9c23472cb2e7787861618c91f7a7a28df71d04bc69176c4c79e656ccc8ccedb1#0 \
+  --spending-tx-in-reference afdd5ccb5d00f4f2162d37768c45ac4450721b59d6ca5ed665725b40a455521e#0 \
   --spending-plutus-script-v2 \
   --spending-reference-tx-in-inline-datum-present \
   --spending-reference-tx-in-redeemer-file $optionsRedeemerFile \
   --mint "-1 ${activeOfferBeacon} + -1 ${activeAskBeacon} + -1 ${activePairBeacon} + -1 ${activeContractId}" \
-  --mint-tx-in-reference 04f467c798753dd43761f4eb7a70a2fa1e07977d198079e9fc364834c535afe3#0 \
+  --mint-tx-in-reference ef3a86147093fe25f4b056e82f52439f4ca71ac898ec0074fd113fb5054a4b45#0 \
   --mint-plutus-script-v2 \
   --mint-reference-tx-in-redeemer-file $activeBeaconRedeemerFile \
   --policy-id $activeBeaconPolicyId \

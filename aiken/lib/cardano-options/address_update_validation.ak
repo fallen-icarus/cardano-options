@@ -97,7 +97,8 @@ fn process_input(
         ask_asset_beacon: ask_asset_beacon,
         strike_price: strike_price,
         expiration: expiration,
-        contract_deposit: contract_deposit,
+        // The writer has now increased the deposit.
+        contract_deposit: contract_deposit+deposit_amount,
         payment_address: new_address,
         contract_id: contract_id
       } |> InlineDatum

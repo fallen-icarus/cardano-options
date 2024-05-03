@@ -38,7 +38,7 @@ data NewDatum
   | NewActiveDatumManual NewActiveInfo
   | NewActiveDatumAuto Network ApiService Int TxOutRef
   | NewPostAddressUpdateActiveDatumManual NewAddressInfo
-  | NewPostAddressUpdateActiveDatumAuto Network ApiService TxOutRef Address
+  | NewPostAddressUpdateActiveDatumAuto Network ApiService TxOutRef Address Integer
   | NewPaymentDatum ContractId
 
 data NewRedeemer

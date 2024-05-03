@@ -893,12 +893,12 @@ benchTest4 number = do
 tests :: [TestTree]
 tests =
   [ mustSucceed "benchTest1" $ benchTest1 18
-  , mustSucceed "benchTest2" $ benchTest2 12
-  , mustSucceed "benchTest3" $ benchTest3 18
-  , mustSucceed "benchTest4" $ benchTest4 12
+  , mustSucceed "benchTest2" $ benchTest2 13
+  , mustSucceed "benchTest3" $ benchTest3 19
+  , mustSucceed "benchTest4" $ benchTest4 13
 
   , mustExceedTxLimits "perfIncreaseTest1" $ benchTest1 19
-  , mustExceedTxLimits "perfIncreaseTest2" $ benchTest2 13
-  , mustExceedTxLimits "perfIncreaseTest3" $ benchTest3 19
-  , mustExceedTxLimits "perfIncreaseTest4" $ benchTest4 13
+  , mustExceedTxLimits "perfIncreaseTest2" $ benchTest2 14
+  , mustExceedTxLimits "perfIncreaseTest3" $ benchTest3 20
+  , mustExceedTxLimits "perfIncreaseTest4" $ benchTest4 14
   ]

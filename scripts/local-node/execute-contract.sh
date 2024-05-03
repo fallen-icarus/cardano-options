@@ -15,10 +15,10 @@ optionsRedeemerFile="${optionsDir}executeContract.json"
 offerAsset='c0f8644a01a6bf5db02f4afe30d604975e63dd274f1098a1738e561d.4f74686572546f6b656e0a'
 askAsset='c0f8644a01a6bf5db02f4afe30d604975e63dd274f1098a1738e561d.54657374546f6b656e31'
 
-contractDeposit=5000000 # 5 ADA
-expiration=1714744278000 # in posix
-contractUTxO="1e8ba02a6e6fb5a151777c6efe8139b1a0f823bb70ec46efdebeb3778a129869#0"
-contractIdName="127f33c969bff4e22750572ae2d512d33013954b01f471e291443931823c66b1"
+contractDeposit=6000000 # 6 ADA
+expiration=1714755185000 # in posix
+contractUTxO="0094644ca620e01f8d9594f6b2ce6a4186ffcc09ff6f4d6fe72fbe99b850ae41#0"
+contractIdName="522c821f25a8feca8cfcfc9711c9cf2eb9ef470a0efaf4bc49c89c53bdb5b576"
 
 ## Convert the expiration to the associated slot number for use as invalid-hereafter.
 expirationSlot=$(cardano-options convert-time --posix-time $expiration --testnet)
@@ -63,10 +63,10 @@ cardano-options datums payment \
 
 ## Create and submit the transaction.
 cardano-cli transaction build \
+  --tx-in 5d6f286fb8f2fc173e9196d29ca92baa26a79a8301590789a36c5141687c22aa#2 \
   --tx-in 7e95de24a4ada8ccd315b01d2f08d845d05e370b6f33e2f9238c80f66d2a4582#0 \
-  --tx-in b806ae2059c34764803a8bb0c238b1b81a7817c55dad22145078e4832524d8df#2 \
   --tx-in $contractUTxO \
-  --spending-tx-in-reference 9c23472cb2e7787861618c91f7a7a28df71d04bc69176c4c79e656ccc8ccedb1#0 \
+  --spending-tx-in-reference afdd5ccb5d00f4f2162d37768c45ac4450721b59d6ca5ed665725b40a455521e#0 \
   --spending-plutus-script-v2 \
   --spending-reference-tx-in-inline-datum-present \
   --spending-reference-tx-in-redeemer-file $optionsRedeemerFile \
@@ -74,7 +74,7 @@ cardano-cli transaction build \
   --tx-out-inline-datum-file $paymentDatumFile \
   --tx-out "$(cat ${walletDir}02.addr) + 3000000 lovelace + 12 ${askAsset}" \
   --mint "-1 ${activeOfferBeacon} + -1 ${activeAskBeacon} + -1 ${activePairBeacon} + -2 ${activeContractId}" \
-  --mint-tx-in-reference 04f467c798753dd43761f4eb7a70a2fa1e07977d198079e9fc364834c535afe3#0 \
+  --mint-tx-in-reference ef3a86147093fe25f4b056e82f52439f4ca71ac898ec0074fd113fb5054a4b45#0 \
   --mint-plutus-script-v2 \
   --mint-reference-tx-in-redeemer-file $activeBeaconRedeemerFile \
   --policy-id $activeBeaconPolicyId \

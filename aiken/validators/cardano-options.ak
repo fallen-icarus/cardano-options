@@ -263,6 +263,7 @@ validator(proxy_hash: ScriptHash, options_script_hash: ScriptHash) {
         //         valid staking credential.
         //      e) There must be a corresponding Active UTxO output to the writer's address with:
         //         1) The value must be starting value + ada deposit_increase
+        //         2) The contractDeposit must be increased by the deposit_increase.
         //
         // There is no need to check if the contract is expired since the writer is already
         // incentivized to close the expired contract instead of updating the address.

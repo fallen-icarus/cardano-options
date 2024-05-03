@@ -158,9 +158,9 @@ Bottleneck: Memory
 | 1 | 0.364356 ADA | 0.546534 ADA |
 | 5 | 0.651614 ADA | 0.977421 ADA |
 | 10 | 1.281881 ADA | 1.922822 ADA |
-| 12 | 1.634363 ADA | 2.451545 ADA |
+| 13 | 1.634363 ADA | 2.451545 ADA |
 
-Max: 12 Contracts  
+Max: 13 Contracts  
 Bottleneck: Memory
 
 ## Closing Expired Active UTxOs
@@ -183,9 +183,9 @@ Bottleneck: Memory
 | 1 | 0.237353 ADA | 0.356030 ADA |
 | 5 | 0.498704 ADA | 0.748056 ADA |
 | 10 | 1.100580 ADA | 1.650870 ADA |
-| 12 | 1.448727 ADA | 2.173091 ADA |
+| 13 | 1.448727 ADA | 2.173091 ADA |
 
-Max: 12 Contracts  
+Max: 13 Contracts  
 Bottleneck: Memory
 
 ## Updating Payment Addresses of Active UTxOs

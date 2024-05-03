@@ -87,11 +87,12 @@ runCreateDatum (NewActiveDatumAuto network endpoint desiredTermsIndex proposalRe
     _ -> error "Not a Proposal UTxO."
 runCreateDatum (NewPostAddressUpdateActiveDatumManual datum) file = 
   writeData file $ unsafeCreatePostAddressUpdateActiveDatum datum
-runCreateDatum (NewPostAddressUpdateActiveDatumAuto network endpoint contractRef newAddr) file = do
+runCreateDatum (NewPostAddressUpdateActiveDatumAuto network endpoint contractRef newAddr incr) file = do
   utxo <- runQuerySpecificOptionsUTxO network endpoint contractRef
   case utxo of
     [OptionsUTxO{optionsDatum=Just (Active datum)}] -> 
       writeData file $ datum & #paymentAddress .~ newAddr
+                             & #contractDeposit .~ (datum ^. #contractDeposit) + incr
     _ -> error "Not an Active UTxO."
 
 runCreateRedeemer :: NewRedeemer -> FilePath -> IO ()

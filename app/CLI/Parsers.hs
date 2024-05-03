@@ -210,6 +210,7 @@ pCreatePostAddressUpdateActiveAuto =
         <*> pApiService
         <*> pContractTxOutRef
         <*> pPaymentAddress
+        <*> pDepositIncrease
 
 -------------------------------------------------
 -- CreateRedeemer Parser

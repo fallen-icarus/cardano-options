@@ -27,7 +27,7 @@ extraKey="${activePolicyId}.${contractIdName}"
 cardano-cli transaction build \
   --tx-in b806ae2059c34764803a8bb0c238b1b81a7817c55dad22145078e4832524d8df#2 \
   --mint "-1 ${extraKey}" \
-  --mint-tx-in-reference 04f467c798753dd43761f4eb7a70a2fa1e07977d198079e9fc364834c535afe3#0 \
+  --mint-tx-in-reference ef3a86147093fe25f4b056e82f52439f4ca71ac898ec0074fd113fb5054a4b45#0 \
   --mint-plutus-script-v2 \
   --mint-reference-tx-in-redeemer-file $activeRedeemerFile \
   --policy-id $activePolicyId \

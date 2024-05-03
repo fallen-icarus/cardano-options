@@ -36,7 +36,7 @@ cardano-cli stake-address registration-certificate \
 
 ## Create and submit the transaction.
 cardano-cli transaction build \
-  --tx-in 04f467c798753dd43761f4eb7a70a2fa1e07977d198079e9fc364834c535afe3#1 \
+  --tx-in ef3a86147093fe25f4b056e82f52439f4ca71ac898ec0074fd113fb5054a4b45#1 \
   --change-address "$(cat "${walletDir}01.addr")" \
   --certificate-file $proposalCert \
   --certificate-file $addressUpdateCert \

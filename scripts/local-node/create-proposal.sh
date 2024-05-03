@@ -21,12 +21,12 @@ contractDeposit=5000000 # 5 ADA
 
 currentSlot=$(cardano-options query current-slot --testnet)
 
-## The first expiration will be 1000 slots from now.
-expirationSlot1=$((currentSlot + 1000))
+## The first expiration will be 2000 slots from now.
+expirationSlot1=$((currentSlot + 2000))
 expirationTime1=$(cardano-options convert-time --slot $expirationSlot1 --testnet)
 
-## The second expiration will be 2000 slots from now.
-expirationSlot2=$((currentSlot + 2000))
+## The second expiration will be 3000 slots from now.
+expirationSlot2=$((currentSlot + 3000))
 expirationTime2=$(cardano-options convert-time --slot $expirationSlot2 --testnet)
 
 ## Export the scripts.
@@ -94,12 +94,12 @@ pairBeacon="${beaconPolicyId}.${pairBeaconName}"
 ## Create and submit the transaction.
 ## invalid-hereafter should be set to the earliest expiration slot.
 cardano-cli transaction build \
-  --tx-in a1797d0186118d658ca66156c4ecd669073ec79282e65cbbda19d2ada41ebe71#1 \
-  --tx-in fe542138caf0ff71bdded4ececbd4206a06d309d508de7fd5e3677f9e44deeda#0 \
+  --tx-in 1e8ba02a6e6fb5a151777c6efe8139b1a0f823bb70ec46efdebeb3778a129869#1 \
+  --tx-in 08da3a6ff7dfe5b20d50d3773406f6b95f6f9c4339456219d826d4be3274f7b1#0 \
   --tx-out "${writerOptionsAddr} + ${contractDeposit} lovelace + 1 ${askBeacon} + 1 ${offerBeacon} + 1 ${premiumBeacon} + 1 ${pairBeacon} + 10 ${offerAsset}" \
   --tx-out-inline-datum-file $proposalDatumFile \
   --mint "1 ${askBeacon} + 1 ${offerBeacon} + 1 ${pairBeacon} + 1 ${premiumBeacon}" \
-  --mint-tx-in-reference a1797d0186118d658ca66156c4ecd669073ec79282e65cbbda19d2ada41ebe71#0 \
+  --mint-tx-in-reference 0f070c06650f0aec11352496afc0ff684398d2eb60fd73ab262079119930f030#0 \
   --mint-plutus-script-v2 \
   --mint-reference-tx-in-redeemer-file $beaconRedeemerFile \
   --policy-id $beaconPolicyId \

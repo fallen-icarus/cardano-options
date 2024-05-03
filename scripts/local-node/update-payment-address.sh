@@ -21,9 +21,11 @@ activeDatumFile="${optionsDir}activeDatum.json"
 offerAsset='c0f8644a01a6bf5db02f4afe30d604975e63dd274f1098a1738e561d.4f74686572546f6b656e0a'
 askAsset='c0f8644a01a6bf5db02f4afe30d604975e63dd274f1098a1738e561d.54657374546f6b656e31'
 
+depositIncrease=1000000 # 1 ADA
 contractDeposit=5000000 # 5 ADA
-contractUTxO="b806ae2059c34764803a8bb0c238b1b81a7817c55dad22145078e4832524d8df#1"
-contractIdName="127f33c969bff4e22750572ae2d512d33013954b01f471e291443931823c66b1"
+newDeposit=$((contractDeposit + depositIncrease))
+contractUTxO="5d6f286fb8f2fc173e9196d29ca92baa26a79a8301590789a36c5141687c22aa#1"
+contractIdName="522c821f25a8feca8cfcfc9711c9cf2eb9ef470a0efaf4bc49c89c53bdb5b576"
 
 ## Generate the hash for the staking verification key.
 echo "Calculating the staking pubkey hash for the writer..."
@@ -50,7 +52,7 @@ cardano-options redeemers address-update-script observe-address-update \
 echo "Creating the options spending redeemer..."
 cardano-options redeemers options-script update-payment-address \
   --payment-address "$newPaymentAddr" \
-  --deposit-increase 0 \
+  --deposit-increase $depositIncrease \
   --out-file $optionsRedeemerFile
 
 ## Create the Active datum.
@@ -60,6 +62,7 @@ cardano-options datums active post-address-update auto \
   --testnet \
   --contract-ref $contractUTxO \
   --payment-address "$newPaymentAddr"\
+  --deposit-increase $depositIncrease \
   --out-file $activeDatumFile
 
 # cardano-options datums active post-address-update manual \
@@ -98,16 +101,16 @@ activeContractId="${activeBeaconPolicyId}.${contractIdName}"
 
 # Create and submit the transaction.
 cardano-cli transaction build \
-  --tx-in 79a30b0dd58d8bda1d6f2202dfc5112e4d981dbdf6ad24294f1cd7da03ba6332#3 \
+  --tx-in afdd5ccb5d00f4f2162d37768c45ac4450721b59d6ca5ed665725b40a455521e#1 \
   --tx-in $contractUTxO \
-  --spending-tx-in-reference 9c23472cb2e7787861618c91f7a7a28df71d04bc69176c4c79e656ccc8ccedb1#0 \
+  --spending-tx-in-reference afdd5ccb5d00f4f2162d37768c45ac4450721b59d6ca5ed665725b40a455521e#0 \
   --spending-plutus-script-v2 \
   --spending-reference-tx-in-inline-datum-present \
   --spending-reference-tx-in-redeemer-file $optionsRedeemerFile \
-  --tx-out "${writerAddr} + ${contractDeposit} lovelace + 1 ${activeOfferBeacon} + 1 ${activeAskBeacon} + 1 ${activePairBeacon} + 1 ${activeContractId} + 10 ${offerAsset}" \
+  --tx-out "${writerAddr} + ${newDeposit} lovelace + 1 ${activeOfferBeacon} + 1 ${activeAskBeacon} + 1 ${activePairBeacon} + 1 ${activeContractId} + 10 ${offerAsset}" \
   --tx-out-inline-datum-file $activeDatumFile \
   --withdrawal "${observerAddress}+0" \
-  --withdrawal-tx-in-reference a7c0a2283eb804111bd39f40f9e9cafa05d6da14d4bf8d20d2aaa67b5fb0cde6#0 \
+  --withdrawal-tx-in-reference 27ef87944b571eecd9618461f496245f00e229f2e5004f1798b097312b1803ad#0 \
   --withdrawal-plutus-script-v2 \
   --withdrawal-reference-tx-in-redeemer-file $observerRedeemerFile \
   --required-signer-hash $writerStakePubKeyHash \

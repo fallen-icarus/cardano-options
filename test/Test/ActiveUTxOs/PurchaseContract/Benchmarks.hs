@@ -639,12 +639,12 @@ benchTest4 number = do
 -- | A `TestTree` containing all benchmark scenarios for purchasing Proposal UTxOs.
 tests :: [TestTree]
 tests =
-  [ mustSucceed "benchTest1" $ benchTest1 13
+  [ mustSucceed "benchTest1" $ benchTest1 12
   , mustSucceed "benchTest2" $ benchTest2 9
   , mustSucceed "benchTest3" $ benchTest3 8
   , mustSucceed "benchTest4" $ benchTest4 12
 
-  , mustExceedTxLimits "perfIncreaseTest1" $ benchTest1 14
+  , mustExceedTxLimits "perfIncreaseTest1" $ benchTest1 13
   , mustExceedTxLimits "perfIncreaseTest2" $ benchTest2 10
   , mustExceedTxLimits "perfIncreaseTest3" $ benchTest3 9
   , mustExceedTxLimits "perfIncreaseTest4" $ benchTest4 13

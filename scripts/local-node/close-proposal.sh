@@ -65,7 +65,7 @@ cardano-cli transaction build \
   --spending-reference-tx-in-redeemer-file $optionsRedeemerFile \
   --tx-out "$(cat ${walletDir}01.addr) + 2000000 lovelace + 10 ${offerAsset}" \
   --mint "-1 ${askBeacon} + -1 ${offerBeacon} + -1 ${pairBeacon} + -1 ${premiumBeacon}" \
-  --mint-tx-in-reference a1797d0186118d658ca66156c4ecd669073ec79282e65cbbda19d2ada41ebe71#0 \
+  --mint-tx-in-reference 0f070c06650f0aec11352496afc0ff684398d2eb60fd73ab262079119930f030#0 \
   --mint-plutus-script-v2 \
   --mint-reference-tx-in-redeemer-file $beaconRedeemerFile \
   --policy-id $beaconPolicyId \

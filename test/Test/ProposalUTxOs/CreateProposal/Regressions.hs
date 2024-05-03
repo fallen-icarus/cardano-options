@@ -56,7 +56,7 @@ regressionTest1 = do
                   [ (unOfferBeacon offerBeacon, 1)
                   , (unAskBeacon askBeacon, 1)
                   , (unTradingPairBeacon tradingPairBeacon, 1)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, 1)
+                  , (unPremiumBeacon premiumBeacon, 1)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -70,7 +70,7 @@ regressionTest1 = do
                   [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                   , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                   , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                   , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                   ]
               , outputDatum = OutputDatum $ toDatum proposalDatum
@@ -139,7 +139,7 @@ regressionTest2 = do
                   [ (unOfferBeacon offerBeacon, 1)
                   , (unAskBeacon askBeacon, 1)
                   , (unTradingPairBeacon tradingPairBeacon, 1)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, 1)
+                  , (unPremiumBeacon premiumBeacon, 1)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -153,7 +153,7 @@ regressionTest2 = do
                   [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                   , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                   , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                   , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                   ]
               , outputDatum = OutputDatum $ toDatum proposalDatum
@@ -213,7 +213,7 @@ regressionTest3 = do
                   [ (unOfferBeacon offerBeacon, 3)
                   , (unAskBeacon askBeacon, 3)
                   , (unTradingPairBeacon tradingPairBeacon, 3)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, 3)
+                  , (unPremiumBeacon premiumBeacon, 3)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -227,7 +227,7 @@ regressionTest3 = do
                 [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                 , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                 ]
             , outputDatum = OutputDatum $ toDatum proposalDatum
@@ -304,7 +304,7 @@ regressionTest4 = do
                   [ (unOfferBeacon offerBeacon, 1)
                   , (unAskBeacon askBeacon, 1)
                   , (unTradingPairBeacon tradingPairBeacon, 1)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, 1)
+                  , (unPremiumBeacon premiumBeacon, 1)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -318,7 +318,7 @@ regressionTest4 = do
                 [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                 , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                 ]
             , outputDatum = OutputDatum $ toDatum datum
@@ -400,7 +400,7 @@ regressionTest5 = do
                   [ (unOfferBeacon offerBeacon, 1)
                   , (unAskBeacon askBeacon, 1)
                   , (unTradingPairBeacon tradingPairBeacon, 1)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, 1)
+                  , (unPremiumBeacon premiumBeacon, 1)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -414,7 +414,7 @@ regressionTest5 = do
                 [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                 , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                 ]
             , outputDatum = OutputDatum $ toDatum datum
@@ -483,7 +483,7 @@ regressionTest6 = do
                   [ (unOfferBeacon offerBeacon, 2)
                   , (unAskBeacon askBeacon, 2)
                   , (unTradingPairBeacon tradingPairBeacon, 2)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, 2)
+                  , (unPremiumBeacon premiumBeacon, 2)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -497,7 +497,7 @@ regressionTest6 = do
                   [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                   , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                   , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                   , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                   ]
               , outputDatum = OutputDatum $ toDatum proposalDatum
@@ -509,7 +509,7 @@ regressionTest6 = do
                   [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                   , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                   , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                   , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                   ]
               , outputDatum = OutputDatum $ toDatum proposalDatum
@@ -521,6 +521,80 @@ regressionTest6 = do
       , validityRange = ValidityRange
           { validityRangeLowerBound = Nothing
           , validityRangeUpperBound = Just 1000
+          }
+      }
+
+-- | Create a single valid Proposal UTxO. The Proposal UTxO has only one possible `Terms`. The 
+-- expiration for the term is after the invalid-hereafter slot.
+regressionTest7 :: MonadEmulator m => m ()
+regressionTest7 = do
+  let -- Writer Info
+      writerWallet = Mock.knownMockWallet 1
+      writerPersonalAddr = Mock.mockWalletAddress writerWallet
+      writerPayPrivKey = Mock.paymentPrivateKey writerWallet
+      writerPubKey = LA.unPaymentPubKeyHash $ Mock.paymentPubKeyHash writerWallet
+      writerCred = PV2.PubKeyCredential writerPubKey
+      optionsAddress = toCardanoApiAddress $ PV2.Address 
+        { addressCredential = PV2.ScriptCredential optionsScriptHash
+        , addressStakingCredential = Just $ PV2.StakingHash writerCred
+        }
+
+      -- Contract Info
+      proposalDatum@ProposalDatum{..} = unsafeCreateProposalDatum $ NewProposalInfo
+        { offerAsset = OfferAsset (adaSymbol,adaToken)
+        , offerQuantity = 10_000_000
+        , askAsset = AskAsset (testTokenSymbol,"TestToken1")
+        , premiumAsset = PremiumAsset (adaSymbol,adaToken)
+        , contractDeposit = 5_000_000
+        , paymentAddress = toPlutusAddress writerPersonalAddr
+        , possibleTerms =
+            [ Terms
+                { expiration = slotToPosixTime 1000
+                , strikePrice = Fraction (1,1_000_000)
+                , premium = 2_000_000
+                }
+            ]
+        }
+
+  -- Initialize scenario
+  References{..} <- initializeReferenceScripts 
+  mintTestTokens writerWallet 10_000_000 [("TestToken1",1000)]
+
+  -- Try to create the Proposal UTxO.
+  void $ transact writerPersonalAddr [refScriptAddress] [writerPayPrivKey] $
+    emptyTxParams
+      { tokens =
+          [ TokenMint
+              { mintTokens = 
+                  [ (unOfferBeacon offerBeacon, 1)
+                  , (unAskBeacon askBeacon, 1)
+                  , (unTradingPairBeacon tradingPairBeacon, 1)
+                  , (unPremiumBeacon premiumBeacon, 1)
+                  ]
+              , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
+              , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
+              , mintReference = Just proposalBeaconsRef
+              }
+          ]
+      , outputs =
+          [ Output
+              { outputAddress = optionsAddress
+              , outputValue = utxoValue (fromIntegral contractDeposit) $ mconcat
+                  [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
+                  , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
+                  ]
+              , outputDatum = OutputDatum $ toDatum proposalDatum
+              , outputReferenceScript = toReferenceScript Nothing
+              }
+          ]
+      , referenceInputs = [proposalBeaconsRef]
+      , extraKeyWitnesses = [writerPubKey]
+      , validityRange = ValidityRange
+          { validityRangeLowerBound = Nothing
+          , validityRangeUpperBound = Just 100
           }
       }
 
@@ -536,4 +610,5 @@ tests =
   , mustSucceed "regressionTest4" regressionTest4
   , mustSucceed "regressionTest5" regressionTest5
   , mustSucceed "regressionTest6" regressionTest6
+  , mustSucceed "regressionTest7" regressionTest7
   ]

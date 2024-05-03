@@ -7,21 +7,20 @@ license: Apache-2.0
 author: fallen-icarus
 maintainer: modern.daidalos+git@gmail.com
 copyright: 2023 fallen-icarus
-extra-source-files: CHANGELOG.md
+extra-source-files: 
+    CHANGELOG.md
+  , aiken/plutus.json
+  , mainnet-params.json
+  , preprod-params.json
 
 common lang
   build-depends: base
-  default-language: Haskell2010
+  default-language: GHC2021
   ghc-options: -Wall -Wredundant-constraints
   default-extensions:
-    DeriveGeneric
-    FlexibleContexts
-    ImportQualifiedPost
-    NamedFieldPuns
-    NumericUnderscores
-    TupleSections
-    TypeApplications
     OverloadedLabels
+    OverloadedStrings
+    RecordWildCards
 
 common internals
   build-depends:
@@ -66,6 +65,39 @@ test-suite cardano-options-tests
   hs-source-dirs: test
   ghc-options:
   other-modules:
+      Test.ActiveUTxOs
+    , Test.ActiveUTxOs.CloseExpiredContract
+    , Test.ActiveUTxOs.CloseExpiredContract.Benchmarks
+    , Test.ActiveUTxOs.CloseExpiredContract.Failures
+    , Test.ActiveUTxOs.CloseExpiredContract.Regressions
+    , Test.ActiveUTxOs.ExecuteContract
+    , Test.ActiveUTxOs.ExecuteContract.Benchmarks
+    , Test.ActiveUTxOs.ExecuteContract.Failures
+    , Test.ActiveUTxOs.ExecuteContract.Regressions
+    , Test.ActiveUTxOs.Misc
+    , Test.ActiveUTxOs.PurchaseContract
+    , Test.ActiveUTxOs.PurchaseContract.Benchmarks
+    , Test.ActiveUTxOs.PurchaseContract.Failures
+    , Test.ActiveUTxOs.PurchaseContract.Regressions
+    , Test.ActiveUTxOs.UpdatePaymentAddress
+    , Test.ActiveUTxOs.UpdatePaymentAddress.Benchmarks
+    , Test.ActiveUTxOs.UpdatePaymentAddress.Failures
+    , Test.ActiveUTxOs.UpdatePaymentAddress.Regressions
+    , Test.Misc
+    , Test.Prelude
+    , Test.ProposalUTxOs
+    , Test.ProposalUTxOs.CloseProposal
+    , Test.ProposalUTxOs.CloseProposal.Benchmarks
+    , Test.ProposalUTxOs.CloseProposal.Failures
+    , Test.ProposalUTxOs.CloseProposal.Regressions
+    , Test.ProposalUTxOs.CreateProposal
+    , Test.ProposalUTxOs.CreateProposal.Benchmarks
+    , Test.ProposalUTxOs.CreateProposal.Failures
+    , Test.ProposalUTxOs.CreateProposal.Regressions
+    , Test.ProposalUTxOs.UpdateProposal
+    , Test.ProposalUTxOs.UpdateProposal.Benchmarks
+    , Test.ProposalUTxOs.UpdateProposal.Failures
+    , Test.ProposalUTxOs.UpdateProposal.Regressions
   build-depends:
       cardano-options
     , data-default
@@ -74,36 +106,39 @@ test-suite cardano-options-tests
     , mtl
     , microlens
     , cardano-node-emulator
-  default-extensions:
-    OverloadedStrings
-    RecordWildCards
+    , optics-extra
 
--- executable cardano-options
---     import: lang
---     main-is:          Main.hs
---     -- Modules included in this executable, other than Main.
---     other-modules:
---         CLI.Types
---       , CLI.Parsers
---       , CLI.Run
---       , CLI.BlockfrostApi
---       , CLI.Query
---     build-depends:    
---       cardano-options,
---       optparse-applicative,
---       servant,
---       aeson,
---       servant-client,
---       http-client,
---       http-client-tls,
---       text,
---       containers,
---       vector,
---       aeson-pretty,
---       bytestring,
---       utf8-string,
---       cardano-addresses,
---       text
---     ghc-options: -O2
---     hs-source-dirs:   app
---     default-language: Haskell2010
+executable cardano-options
+  import: 
+      lang
+    , internals
+  main-is: Main.hs
+  other-modules:
+      CLI.Data.ApiService
+    , CLI.Data.Asset
+    , CLI.Data.Bech32Address
+    , CLI.Data.Commands
+    , CLI.Data.Network
+    , CLI.Data.OptionsUTxO
+    , CLI.Data.Output
+    , CLI.Data.PersonalUTxO
+    , CLI.Data.TxCBOR
+    , CLI.Parsers
+    , CLI.Query
+    , CLI.Query.Koios
+    , CLI.Run
+  build-depends:    
+      cardano-options
+    , cardano-addresses
+    , optparse-applicative
+    , servant
+    , servant-client
+    , http-client
+    , http-client-tls
+    , vector
+    , aeson-pretty
+    , file-embed
+    , prettyprinter-ansi-terminal
+  hs-source-dirs: app
+  default-extensions:
+    NoImplicitPrelude

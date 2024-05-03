@@ -1,14 +1,11 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -42,7 +39,7 @@ module CardanoOptions
   , genContractId
   , genOfferBeaconName
   , genAskBeaconName
-  , genPremiumAssetBeaconName
+  , genPremiumBeaconName
   , genTradingPairBeaconName
 
     -- * Creating Datums
@@ -53,14 +50,16 @@ module CardanoOptions
   , createActiveDatumFromProposal
   , NewAddressInfo(..)
   , unsafeCreatePostAddressUpdateActiveDatum
-  , createPostAddressUpdateDatumFromActiveDatum
 
+    -- * Helper Functions
+  , requiredAmount
+
+    -- * Re-exports
   , module CardanoOptions.Types
   , module CardanoOptions.Utils
   ) where
 
 import qualified PlutusTx
-import qualified PlutusTx.Ratio as PlutusTx
 import qualified PlutusTx.Prelude as PlutusTx
 import qualified Data.Map as Map
 import Data.Aeson
@@ -101,7 +100,7 @@ data ProposalDatum = ProposalDatum
   -- | The asset the premium must be paid in.
   , premiumAsset :: PremiumAsset
   -- | The token name for the premium asset beacon.
-  , premiumAssetBeacon :: PremiumAssetBeacon
+  , premiumBeacon :: PremiumBeacon
   -- | The amount the writer paid for the minUTxOValue.
   , contractDeposit :: Integer
   -- | The address where the premium must go upon purchase of the contract.
@@ -113,11 +112,31 @@ data ProposalDatum = ProposalDatum
 PlutusTx.makeIsDataIndexed ''ProposalDatum [('ProposalDatum,0)]
 makeFieldLabelsNoPrefix ''ProposalDatum
 
+instance ToJSON ProposalDatum where
+  toJSON ProposalDatum{..} =
+    object [ "proposal_beacon_id" .= proposalBeaconId
+           , "active_beacon_id" .= activeBeaconId
+           , "offer_asset" .= offerAsset
+           , "offer_quantity" .= offerQuantity
+           , "ask_asset" .= askAsset
+           , "trading_pair_beacon" .= tradingPairBeacon
+           , "offer_beacon" .= offerBeacon
+           , "ask_beacon" .= askBeacon
+           , "premium_asset" .= premiumAsset
+           , "premium_beacon" .= premiumBeacon
+           , "contract_deposit" .= contractDeposit
+           , "payment_address" .= paymentAddress
+           , "possible_terms" .= possibleTerms
+           ]
+
 -- | The datum for an options contract that has been purchased, and can be executed any time up
 -- until the expiration.
 data ActiveDatum = ActiveDatum
+  -- | The policy id for the proposal beacon script. This is needed to support using the same 
+  -- active beacons redeemer for purchases, executions, and closing expired.
+  { proposalBeaconId :: ProposalBeaconId
   -- | The policy id for the active beacon script.
-  { activeBeaconId :: ActiveBeaconId
+  , activeBeaconId :: ActiveBeaconId
   -- | The hash of the address update observer script.
   , addressObserverHash :: ScriptHash
   -- | The asset being offered.
@@ -143,6 +162,23 @@ data ActiveDatum = ActiveDatum
   -- | The unique identitier for this contract.
   , contractId :: ContractId
   } deriving (Generic,Show)
+
+instance ToJSON ActiveDatum where
+  toJSON ActiveDatum{..} =
+    object [ "proposal_beacon_id" .= proposalBeaconId
+           , "active_beacon_id" .= activeBeaconId
+           , "offer_asset" .= offerAsset
+           , "offer_quantity" .= offerQuantity
+           , "ask_asset" .= askAsset
+           , "trading_pair_beacon" .= tradingPairBeacon
+           , "offer_beacon" .= offerBeacon
+           , "ask_beacon" .= askBeacon
+           , "contract_deposit" .= contractDeposit
+           , "payment_address" .= paymentAddress
+           , "strike_price" .= strikePrice
+           , "expiration" .= getPOSIXTime expiration
+           , "contract_id" .= contractId
+           ]
 
 PlutusTx.makeIsDataIndexed ''ActiveDatum [('ActiveDatum,1)]
 makeFieldLabelsNoPrefix ''ActiveDatum
@@ -199,11 +235,7 @@ data ProposalBeaconsRedeemer
 data ActiveBeaconsRedeemer
   -- | Create some Active UTxOs (1 or more) by buying Proposal UTxOs. The CurrencySymbol is the 
   -- policy id for the proposal beacons.
-  = PurchaseContracts { proposalPolicyId :: CurrencySymbol }
-  -- | Burn the lock and key NFT to execute the options contracts.
-  | ExecuteContracts
-  -- | Burn all beacons to claim expired options contracts.
-  | CloseExpiredContracts
+  = PurchaseExecuteOrCloseExpiredContracts { proposalPolicyId :: CurrencySymbol }
   -- | Burn any beacons.
   | BurnActiveBeacons
   deriving (Generic,Show)
@@ -288,9 +320,9 @@ genAskBeaconName (AskAsset ((CurrencySymbol sym),(TokenName name))) =
     prefix = unsafeToBuiltinByteString "02"
 
 -- | Create the premium asset beacon name for the premium asset.
-genPremiumAssetBeaconName :: PremiumAsset -> PremiumAssetBeacon
-genPremiumAssetBeaconName (PremiumAsset ((CurrencySymbol sym),(TokenName name))) =
-    PremiumAssetBeacon $ TokenName $ PlutusTx.sha2_256 $ prefix <> sym <> name
+genPremiumBeaconName :: PremiumAsset -> PremiumBeacon
+genPremiumBeaconName (PremiumAsset ((CurrencySymbol sym),(TokenName name))) =
+    PremiumBeacon $ TokenName $ PlutusTx.sha2_256 $ prefix <> sym <> name
   where
     prefix :: BuiltinByteString
     prefix = unsafeToBuiltinByteString "03"
@@ -340,7 +372,7 @@ unsafeCreateProposalDatum NewProposalInfo{..} = ProposalDatum
   , offerBeacon = genOfferBeaconName offerAsset
   , askBeacon = genAskBeaconName askAsset
   , premiumAsset = premiumAsset
-  , premiumAssetBeacon = genPremiumAssetBeaconName premiumAsset
+  , premiumBeacon = genPremiumBeaconName premiumAsset
   , contractDeposit = contractDeposit
   , paymentAddress = paymentAddress
   , possibleTerms = possibleTerms
@@ -370,7 +402,8 @@ data NewActiveInfo = NewActiveInfo
 -- useful for testing the smart contracts.
 unsafeCreateActiveDatum :: NewActiveInfo -> ActiveDatum
 unsafeCreateActiveDatum NewActiveInfo{..} = ActiveDatum
-  { activeBeaconId = ActiveBeaconId activeBeaconCurrencySymbol
+  { proposalBeaconId = ProposalBeaconId proposalBeaconCurrencySymbol
+  , activeBeaconId = ActiveBeaconId activeBeaconCurrencySymbol
   , addressObserverHash = addressObserverScriptHash
   , offerAsset = offerAsset
   , offerQuantity = offerQuantity
@@ -388,7 +421,8 @@ unsafeCreateActiveDatum NewActiveInfo{..} = ActiveDatum
 -- | Create an ActiveDatum from a ProposalDatum, its output reference, and the desiredTermsIndex.
 createActiveDatumFromProposal :: Int -> TxOutRef -> ProposalDatum -> ActiveDatum
 createActiveDatumFromProposal termsIndex proposalId ProposalDatum{..} = ActiveDatum
-    { activeBeaconId = activeBeaconId
+    { proposalBeaconId = proposalBeaconId
+    , activeBeaconId = activeBeaconId
     , addressObserverHash = addressObserverScriptHash
     , offerAsset = offerAsset
     , offerQuantity = offerQuantity
@@ -430,7 +464,8 @@ data NewAddressInfo = NewAddressInfo
 -- useful for testing the smart contracts.
 unsafeCreatePostAddressUpdateActiveDatum :: NewAddressInfo -> ActiveDatum
 unsafeCreatePostAddressUpdateActiveDatum NewAddressInfo{..} = ActiveDatum
-  { activeBeaconId = ActiveBeaconId activeBeaconCurrencySymbol
+  { proposalBeaconId = ProposalBeaconId proposalBeaconCurrencySymbol
+  , activeBeaconId = ActiveBeaconId activeBeaconCurrencySymbol
   , addressObserverHash = addressObserverScriptHash
   , offerAsset = offerAsset
   , offerQuantity = offerQuantity
@@ -445,20 +480,10 @@ unsafeCreatePostAddressUpdateActiveDatum NewAddressInfo{..} = ActiveDatum
   , contractId = contractId
   }
 
--- | Create the new ActiveDatum using the old ActiveDatum.
-createPostAddressUpdateDatumFromActiveDatum :: Address -> ActiveDatum -> ActiveDatum
-createPostAddressUpdateDatumFromActiveDatum newAddress ActiveDatum{..} = ActiveDatum
-  { activeBeaconId = activeBeaconId
-  , addressObserverHash = addressObserverHash
-  , offerAsset = offerAsset
-  , offerQuantity = offerQuantity
-  , askAsset = askAsset
-  , tradingPairBeacon = tradingPairBeacon
-  , offerBeacon = offerBeacon
-  , askBeacon = askBeacon
-  , strikePrice = strikePrice
-  , expiration = expiration
-  , contractDeposit = contractDeposit
-  , paymentAddress = newAddress
-  , contractId = contractId
-  }
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | The total amount of the Ask asset required based on the offer quantity and strike price.
+requiredAmount :: Integer -> Fraction -> Integer
+requiredAmount offerQuantity (Fraction (num,den)) = (offerQuantity * num) `div` den
+

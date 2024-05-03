@@ -89,20 +89,22 @@ pub fn valid_payment_address(proxy_hash: ScriptHash, addr: Address) -> Bool {
 }
 
 // Get the time from the tx's invalid-hereafter setting. The invalid-hereafter setting is used
-// to prove some time has not passed yet.
-pub fn get_upper_bound(val_range: ValidityRange) -> PosixTime {
+// to prove some time has not passed yet. This will not crash the script if invalid-hereafter is not
+// set.
+pub fn get_upper_bound_optional(val_range: ValidityRange) -> Option<PosixTime> {
   when val_range is {
-    Interval(_,IntervalBound(Finite(x),_)) -> x
-    _ -> error @"invalid-hereafter not specified"
+    Interval(_,IntervalBound(Finite(x),_)) -> Some(x)
+    _ -> None
   }
 }
 
 // Get the time from the tx's invalid-before setting. The invalid-before setting is used
-// to prove some time has indeed passed yet.
-pub fn get_lower_bound(val_range: ValidityRange) -> PosixTime {
+// to prove some time has indeed passed yet. This will not crash the script if invalid-before is not
+// set.
+pub fn get_lower_bound_optional(val_range: ValidityRange) -> Option<PosixTime> {
   when val_range is {
-    Interval(IntervalBound(Finite(x),_),_) -> x
-    _ -> error @"invalid-before not specified"
+    Interval(IntervalBound(Finite(x),_),_) -> Some(x)
+    _ -> None
   }
 }
 

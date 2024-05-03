@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Test.Prelude
   ( 
@@ -390,7 +389,7 @@ initializeReferenceScripts = do
       { outputs =
           [ Output
               { outputAddress = refScriptAddress
-              , outputValue = LV.lovelaceToValue 49_000_000
+              , outputValue = LV.lovelaceToValue 52_000_000
               , outputDatum = PV2.NoOutputDatum
               , outputReferenceScript = toReferenceScript $ Just activeBeaconScript
               }
@@ -426,7 +425,7 @@ initializeReferenceScripts = do
       { outputs =
           [ Output
               { outputAddress = refScriptAddress
-              , outputValue = LV.lovelaceToValue 17_000_000
+              , outputValue = LV.lovelaceToValue 15_000_000
               , outputDatum = PV2.NoOutputDatum
               , outputReferenceScript = toReferenceScript $ Just addressObserverScript
               }
@@ -502,7 +501,12 @@ mustExceedTxLimits testName contract =
   testCase testName $
     let (res,(st,lg)) = E.runEmulatorM E.defaultOptions contract
     in case res of
-          Left err -> assertFailure $ show err -- It should return Right.
+          Left err -> 
+            -- It may return left if the budget was overspent.
+            let msg = show err in
+              if elem "overspending" $ words msg
+              then pure () 
+              else assertFailure msg
           Right _ ->  -- Just because it returned a Right does not mean everything succeeded.
             let (res1, _, _) = 
                   runRWS (runExceptT (hasExceededTxLimits lg)) (E.params E.defaultOptions) st

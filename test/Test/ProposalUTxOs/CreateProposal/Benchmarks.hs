@@ -65,7 +65,7 @@ benchTest1 numberCreated = do
                   [ (unOfferBeacon offerBeacon, 1)
                   , (unAskBeacon askBeacon, 1)
                   , (unTradingPairBeacon tradingPairBeacon, 1)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, 1)
+                  , (unPremiumBeacon premiumBeacon, 1)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -79,7 +79,7 @@ benchTest1 numberCreated = do
                 [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                 , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                 ]
             , outputDatum = OutputDatum $ toDatum datum
@@ -93,7 +93,7 @@ benchTest1 numberCreated = do
           }
       }
 
--- | Create ProposalUTxOs where all proposals are for different terms. They all three
+-- | Create ProposalUTxOs where all proposals are for different terms. They all have three
 -- `possibleTerms`.
 benchTest2 :: MonadEmulator m => Int -> m ()
 benchTest2 numberCreated = do
@@ -153,7 +153,7 @@ benchTest2 numberCreated = do
                   [ (unOfferBeacon offerBeacon, 1)
                   , (unAskBeacon askBeacon, 1)
                   , (unTradingPairBeacon tradingPairBeacon, 1)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, 1)
+                  , (unPremiumBeacon premiumBeacon, 1)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -167,7 +167,7 @@ benchTest2 numberCreated = do
                 [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                 , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                 ]
             , outputDatum = OutputDatum $ toDatum datum
@@ -226,7 +226,7 @@ benchTest3 numberCreated  = do
                   [ (unOfferBeacon offerBeacon, fromIntegral numberCreated)
                   , (unAskBeacon askBeacon, fromIntegral numberCreated)
                   , (unTradingPairBeacon tradingPairBeacon, fromIntegral numberCreated)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, fromIntegral numberCreated)
+                  , (unPremiumBeacon premiumBeacon, fromIntegral numberCreated)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -240,7 +240,7 @@ benchTest3 numberCreated  = do
                 [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                 , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                 ]
             , outputDatum = OutputDatum $ toDatum proposalDatum
@@ -309,7 +309,7 @@ benchTest4 numberCreated  = do
                   [ (unOfferBeacon offerBeacon, fromIntegral numberCreated)
                   , (unAskBeacon askBeacon, fromIntegral numberCreated)
                   , (unTradingPairBeacon tradingPairBeacon, fromIntegral numberCreated)
-                  , (unPremiumAssetBeacon premiumAssetBeacon, fromIntegral numberCreated)
+                  , (unPremiumBeacon premiumBeacon, fromIntegral numberCreated)
                   ]
               , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
               , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
@@ -323,12 +323,84 @@ benchTest4 numberCreated  = do
                 [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
                 , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
-                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumAssetBeacon premiumAssetBeacon) 1
+                , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
                 , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
                 ]
             , outputDatum = OutputDatum $ toDatum proposalDatum
             , outputReferenceScript = toReferenceScript Nothing
             }
+      , referenceInputs = [proposalBeaconsRef]
+      , extraKeyWitnesses = [writerPubKey]
+      , validityRange = ValidityRange
+          { validityRangeLowerBound = Nothing
+          , validityRangeUpperBound = Just 1000
+          }
+      }
+
+-- | Create a single valid Proposal UTxO. The Proposal UTxO has multiple possible `Terms`.
+benchTest5 :: MonadEmulator m => Int -> m ()
+benchTest5 number = do
+  let -- Writer Info
+      writerWallet = Mock.knownMockWallet 1
+      writerPersonalAddr = Mock.mockWalletAddress writerWallet
+      writerPayPrivKey = Mock.paymentPrivateKey writerWallet
+      writerPubKey = LA.unPaymentPubKeyHash $ Mock.paymentPubKeyHash writerWallet
+      writerCred = PV2.PubKeyCredential writerPubKey
+      optionsAddress = toCardanoApiAddress $ PV2.Address 
+        { addressCredential = PV2.ScriptCredential optionsScriptHash
+        , addressStakingCredential = Just $ PV2.StakingHash writerCred
+        }
+
+      -- Contract Info
+      proposalDatum@ProposalDatum{..} = unsafeCreateProposalDatum $ NewProposalInfo
+        { offerAsset = OfferAsset (adaSymbol,adaToken)
+        , offerQuantity = 10_000_000
+        , askAsset = AskAsset (testTokenSymbol,"TestToken1")
+        , premiumAsset = PremiumAsset (adaSymbol,adaToken)
+        , contractDeposit = 50_000_000
+        , paymentAddress = toPlutusAddress writerPersonalAddr
+        , possibleTerms = replicate number
+            Terms
+              { expiration = slotToPosixTime 1000
+              , strikePrice = Fraction (1,1_000_000)
+              , premium = 2_000_000
+              }
+        }
+
+  -- Initialize scenario
+  References{..} <- initializeReferenceScripts 
+  mintTestTokens writerWallet 10_000_000 [("TestToken1",1000)]
+
+  -- Try to create the Proposal UTxO.
+  void $ transact writerPersonalAddr [refScriptAddress] [writerPayPrivKey] $
+    emptyTxParams
+      { tokens =
+          [ TokenMint
+              { mintTokens = 
+                  [ (unOfferBeacon offerBeacon, 1)
+                  , (unAskBeacon askBeacon, 1)
+                  , (unTradingPairBeacon tradingPairBeacon, 1)
+                  , (unPremiumBeacon premiumBeacon, 1)
+                  ]
+              , mintRedeemer = toRedeemer CreateCloseOrUpdateProposals
+              , mintPolicy = toVersionedMintingPolicy proposalBeaconScript
+              , mintReference = Just proposalBeaconsRef
+              }
+          ]
+      , outputs =
+          [ Output
+              { outputAddress = optionsAddress
+              , outputValue = utxoValue (fromIntegral contractDeposit) $ mconcat
+                  [ PV2.singleton proposalBeaconCurrencySymbol (unOfferBeacon offerBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unAskBeacon askBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unTradingPairBeacon tradingPairBeacon) 1
+                  , PV2.singleton proposalBeaconCurrencySymbol (unPremiumBeacon premiumBeacon) 1
+                  , uncurry PV2.singleton (unOfferAsset offerAsset) offerQuantity
+                  ]
+              , outputDatum = OutputDatum $ toDatum proposalDatum
+              , outputReferenceScript = toReferenceScript Nothing
+              }
+          ]
       , referenceInputs = [proposalBeaconsRef]
       , extraKeyWitnesses = [writerPubKey]
       , validityRange = ValidityRange
@@ -347,6 +419,7 @@ tests =
   , mustSucceed "benchTest2" $ benchTest2 16
   , mustSucceed "benchTest3" $ benchTest3 27
   , mustSucceed "benchTest4" $ benchTest4 25
+  -- , mustSucceed "benchTest5" $ benchTest5 422
 
   , mustExceedTxLimits "perfIncreaseTest1" $ benchTest1 18
   , mustExceedTxLimits "perfIncreaseTest2" $ benchTest2 17

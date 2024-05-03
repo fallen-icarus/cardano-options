@@ -43,6 +43,9 @@ pub type OptionsDatum {
   // The datum for an options contract that has been purchased, and can be executed any time up
   // until the expiration.
   ActiveDatum {
+    // The policy id for the proposal beacon script. This is needed to support using the same
+    // active beacons redeemer for purchases, executions, and closing expired.
+    proposal_beacon_policy_id: PolicyId,
     // The policy id for the active beacon script.
     active_beacon_policy_id: PolicyId,
     // The hash of the address update observer script.

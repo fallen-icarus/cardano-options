@@ -31,17 +31,11 @@ pub type ProposalBeaconsRedeemer {
 }
 
 pub type ActiveBeaconsRedeemer {
-  // Create some Active UTxOs (1 or more) by buying Proposal UTxOs. The CurrencySymbol is the 
-  // policy id for the proposal beacons.
-  PurchaseContracts{proposal_beacon_id: PolicyId}
+  // This redeemer allows composing purchases, executions, and closing expired in the same 
+  // transaction.
+  PurchaseExecuteOrCloseExpired{proposal_beacon_id: PolicyId}
 
-  // Burn the lock and key NFT to execute the options contracts.
-  ExecuteContracts
-
-  // Burn all beacons to claim expired options contracts.
-  CloseExpiredContracts
-
-  // Burn any beacons.
+  // Burn any beacons. This is used for burning leftover Key NFTs.
   BurnActiveBeacons
 }
 

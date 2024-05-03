@@ -26,7 +26,7 @@ fn is_valid_terms(upper_bound: PosixTime, terms: Terms) -> Bool {
 
   and {
     trace_if_false(@"Invalid possible expiration", expiration >= upper_bound),
-    trace_if_false(@"Invalid possible strike_price", strike_num > 0 && strike_den > 0),
+    trace_if_false(@"Invalid possible strike price", strike_num > 0 && strike_den > 0),
     trace_if_false(@"Invalid possible premium", premium > 0)
   }
 }
@@ -101,7 +101,7 @@ fn extract_proposal_quantity(
         // This path can be taken if the UTxO has only some of the required beacons. This path
         // should never be taken since the script should fail earlier if the UTxO has too few
         // or too many types of beacons.
-        _ -> error @"UTxO does not have the right beacons"
+        _ -> error @"E4"
       }
     } 
 
@@ -143,7 +143,7 @@ fn valid_proposal_output(
   expected_proposal_beacon_id: ProposalBeaconId,
   expected_active_beacon_id: ActiveBeaconId,
   proxy_hash: ScriptHash,
-  upper_bound: PosixTime,
+  upper_bound: Option<PosixTime>,
   output_value: Value,
   output_datum: Datum
 ) -> Bool {
@@ -151,7 +151,7 @@ fn valid_proposal_output(
   expect ProposalDatum{
     proposal_beacon_policy_id,
     active_beacon_policy_id,
-    offer_asset: (offer_policy_id,_) as offer_asset,
+    offer_asset,
     offer_quantity,
     ask_asset: (ask_policy_id,_) as ask_asset,
     trading_pair_beacon,
@@ -164,7 +164,15 @@ fn valid_proposal_output(
     possible_terms
   } = when parse_datum(output_datum) is {
     ProposalDatum{..} as datum -> datum
-    _ -> error @"UTxO not stored with an ProposalDatum"
+    _ -> error @"UTxO not stored with a ProposalDatum"
+  }
+
+  // Extract the actual upper bound for the transaction and throw an error if it was not specified.
+  // This is delayed until now so that closing Proposal UTxOs does not require setting
+  // invalid-hereafter.
+  let upper = when upper_bound is {
+    None -> error @"invalid-hereafter not specified"
+    Some(x) -> x
   }
 
   // Generate the required beacon names based on the trading pair. Direction matters.
@@ -196,14 +204,10 @@ fn valid_proposal_output(
       @"Datum has wrong active beacon id", 
       expected_active_beacon_id == core.to_active_beacon_id(active_beacon_policy_id)),
     trace_if_false(
-      @"Offer asset cannot be protocol beacon", 
-      offer_policy_id != core.from_proposal_beacon_id(expected_proposal_beacon_id) &&
-      offer_policy_id != core.from_active_beacon_id(expected_active_beacon_id)),
-    trace_if_false(
       @"Datum has invalid offer quantity", 
       offer_quantity > 0),
     trace_if_false(
-      @"Ask asset cannot be protocol beacon", 
+      @"Ask asset cannot be a protocol beacon", 
       ask_policy_id != core.from_proposal_beacon_id(expected_proposal_beacon_id) &&
       ask_policy_id != core.from_active_beacon_id(expected_active_beacon_id)),
     trace_if_false(
@@ -219,7 +223,7 @@ fn valid_proposal_output(
       @"Datum has wrong PremiumAsset beacon",
       premium_asset_beacon == core.get_premium_asset_beacon_name(expected_premium_asset_beacon)),
     trace_if_false(
-      @"Premium asset cannot be protocol beacon", 
+      @"Premium asset cannot be a protocol beacon", 
       premium_policy_id != core.from_proposal_beacon_id(expected_proposal_beacon_id) &&
       premium_policy_id != core.from_active_beacon_id(expected_active_beacon_id)),
     trace_if_false(
@@ -228,8 +232,11 @@ fn valid_proposal_output(
     trace_if_false(
       @"Invalid payment address",
       utils.valid_payment_address(proxy_hash,payment_address)),
+    trace_if_false(
+      @"Invalid possible terms",
+      possible_terms != []),
     // Check the possible_terms. This has its own trace messages.
-    list.all(possible_terms,fn(x) {is_valid_terms(upper_bound,x)}),
+    list.all(possible_terms,fn(x) {is_valid_terms(upper,x)}),
     trace_if_false(
       @"Offer asset cannot be same as ask asset",
       offer_asset != ask_asset),
@@ -255,7 +262,7 @@ pub fn proposal_beacons_destination_check(
   active_beacon_id: ActiveBeaconId,
   proxy_hash: ScriptHash,
   outputs: List<Output>,
-  upper_bound: PosixTime
+  upper_bound: Option<PosixTime>
 ) -> Bool {
   // A function to map over the list of outputs.
   let foo = fn (out: Output, acc: Bool) {

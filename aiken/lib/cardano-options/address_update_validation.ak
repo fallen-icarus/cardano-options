@@ -1,7 +1,6 @@
 use aiken/bytearray as byte
 use aiken/dict.{Dict}
 use aiken/list
-use aiken/time.{PosixTime}
 use aiken/transaction.
   { Datum
   , InlineDatum
@@ -11,39 +10,33 @@ use aiken/transaction.
   , Redeemer
   , Spend
   } as tx
-use aiken/transaction/credential.{Address, ScriptCredential}
+use aiken/transaction/credential.{Address, Credential}
 use aiken/transaction/value.{Value, PolicyId, AssetName}
 
 use cardano_options/data/core.{ScriptHash}
-use cardano_options/data/datums.{ActiveDatum}
+use cardano_options/data/datums.{ActiveDatum,ProposalDatum}
 use cardano_options/data/redeemers.{OptionsRedeemer,UpdatePaymentAddress}
 use cardano_options/utils.{error_if_false}
 
 type RequiredContractOutput {
   req_value: List<(PolicyId,Dict<AssetName,Int>)>,
-  req_datum: Datum
+  req_datum: Datum,
+  writer_addr: Address
 }
 
-// Add the deposit increase to the ada balance and check that the BorrowerId is still present.
+// Add the deposit increase to the ada balance, and preserve all of the other balances.
 fn add_deposit_value(
   deposit_amount: Int,
   old_value: Value,
-  active_beacon_id: PolicyId,
 ) -> List<(PolicyId,Dict<AssetName,Int>)> {
   // A function to map over the value of this UTxO. 
   let foo = fn(x: (PolicyId,Dict<AssetName,Int>), acc: List<(PolicyId,Dict<AssetName,Int>)>) {
     let (cn,tns_dict) = x
 
-    // Check for the borrower_id.
-    if cn == active_beacon_id {
-      // It must have the four beacons.
-      expect [(_,_),(_,_),(_,_),(_,_)] = dict.to_list(tns_dict)
-
-      list.concat(acc,[(cn,tns_dict)])
-    } else if cn == #"" {
+    if cn == #"" {
       list.concat(
         acc,
-        [(cn,dict.insert_with(tns_dict,#"",deposit_amount,utils.sum_token_values,byte.compare))]
+        [(cn,dict.insert_with(tns_dict, #"", deposit_amount, utils.sum_token_values, byte.compare))]
       )
     } else {
       list.concat(acc,[(cn,tns_dict)])
@@ -55,15 +48,19 @@ fn add_deposit_value(
 
 // Get the required output information based on the input information.
 fn process_input(
+  writer_addr: Address,
   old_datum: Datum, 
   proxy_hash: ScriptHash,
   new_address: Address,
   deposit_amount: Int, 
-  upper_bound: PosixTime,
   old_value: Value
 ) -> RequiredContractOutput {
   when utils.parse_datum(old_datum) is {
+    // Datum must be an ActiveDatum.
+    ProposalDatum{..} -> error @"Input is not an Active UTxO"
+
     ActiveDatum{
+      proposal_beacon_policy_id,
       active_beacon_policy_id,
       address_observer_hash,
       offer_asset,
@@ -79,11 +76,6 @@ fn process_input(
       ..
     } -> {
       expect True = error_if_false(
-        @"Contract is expired",
-        expiration >= upper_bound
-      )
-
-      expect True = error_if_false(
         @"Deposit increase not >= 0",
         deposit_amount >= 0
       )
@@ -94,6 +86,7 @@ fn process_input(
       )
 
       let contract_datum = ActiveDatum {
+        proposal_beacon_policy_id: proposal_beacon_policy_id,
         active_beacon_policy_id: active_beacon_policy_id,
         address_observer_hash: address_observer_hash,
         offer_asset: offer_asset,
@@ -110,28 +103,23 @@ fn process_input(
       } |> InlineDatum
 
       RequiredContractOutput( 
-        add_deposit_value(deposit_amount,old_value,active_beacon_policy_id),
-        contract_datum
+        add_deposit_value(deposit_amount, old_value),
+        contract_datum,
+        writer_addr
       )
     }
-
-    _ -> error @"Input is not an Active UTxO"
   }
 }
 
 // Compare the inputs to the redeemer maps to get all inputs that are for address updates.
-// It returns the required information for checking the outputs. All contract inputs must be for
-// the same writer.
+// It returns the required information for checking the outputs. 
 fn get_input_info(
-  options_script_hash: ScriptHash,
+  options_script_credential: Credential,
   proxy_hash: ScriptHash,
-  upper_bound: PosixTime,
   inputs: List<Input>,
   redeemers: List<(ScriptPurpose,Redeemer)>,
-  result: (Option<Address>,List<RequiredContractOutput>)
-) -> (Option<Address>,List<RequiredContractOutput>) {
-  let (writer_addr,req_outputs) = result
-
+  req_outputs: List<RequiredContractOutput>
+) -> List<RequiredContractOutput> {
   when (inputs,redeemers) is {
     // Compare the next input to the next redeemer. They are both assumed to be in
     // lexicographical order.
@@ -139,15 +127,7 @@ fn get_input_info(
     , [ (Spend(red_ref),used_redeemer), ..rest_reds ]
     ) -> {
       // If the input is a options script input, do all of the checks.
-      if pay_cred == ScriptCredential(options_script_hash) {
-        expect True = error_if_false(
-          @"All contract inputs must be for the same writer",
-          when writer_addr is {
-            None -> True
-            Some(x) -> addr == x
-          }
-        )
-
+      if pay_cred == options_script_credential {
         expect True = error_if_false(
           @"Inputs are not in lexicographical order",
           in_ref == red_ref
@@ -158,35 +138,32 @@ fn get_input_info(
           // This execution only cares about inputs using the UpdatePaymentAddress redeemer.
           UpdatePaymentAddress{deposit_increase,new_address} -> {
             let new_contract_output = process_input(
+              addr,
               datum,
               proxy_hash,
               new_address,
               deposit_increase,
-              upper_bound,
               val
             )
 
             get_input_info(
-              options_script_hash,
+              options_script_credential,
               proxy_hash,
-              upper_bound,
               rest_ins,
               rest_reds,
-              (Some(addr), list.concat(req_outputs,[new_contract_output]) )
+              list.concat(req_outputs, [new_contract_output])
             )
           }
 
           // If the input is using a different options redeemer, it will be checked by the other
           // redeemer's logic. It can be safely skipped in this execution.
-          _ ->
-            get_input_info(
-              options_script_hash,
-              proxy_hash,
-              upper_bound,
-              rest_ins,
-              rest_reds,
-              result
-            )
+          _ -> get_input_info(
+            options_script_credential,
+            proxy_hash,
+            rest_ins,
+            rest_reds,
+            req_outputs
+          )
         }
 
       // If it is not an options script input, check if it is a pubkey input.
@@ -194,12 +171,11 @@ fn get_input_info(
         // If the input is a pubkey input, the current spend redeemer's input must still
         // be found.
         get_input_info(
-          options_script_hash,
+          options_script_credential,
           proxy_hash,
-          upper_bound,
           rest_ins, // Move on for inputs.
           redeemers, // Keep the current redeemer.
-          result
+          req_outputs
         )
 
       // If none of the above branches matched, then this must be a input for another script.
@@ -207,31 +183,25 @@ fn get_input_info(
         // If the input is a script input that is not a options' input, move on for both
         // the inputs and the redeemers.
         get_input_info(
-          options_script_hash,
+          options_script_credential,
           proxy_hash,
-          upper_bound,
           rest_ins, // Move on for inputs.
           rest_reds, // Move on for redeemers.
-          result
+          req_outputs
         )
       }
     }
 
-    // There are no more inputs to check.
-    ([], _) -> result
-
     // If the redeemer is not a Spend purpose, skip it.
-    (_ , [_, ..rest_reds]) -> 
-      get_input_info(
-        options_script_hash,
-        proxy_hash,
-        upper_bound,
-        inputs,
-        rest_reds,
-        result
-      )
+    (_ , [_, ..rest_reds]) -> get_input_info(
+      options_script_credential,
+      proxy_hash,
+      inputs,
+      rest_reds,
+      req_outputs
+    )
 
-    (_,[]) -> error @"E3" // The redeemer map should never run out first.
+    _ -> req_outputs
   }
 }
 
@@ -239,8 +209,7 @@ fn get_input_info(
 // input 1 are before the outputs for options input 2). The script will fail if this assumption is not
 // true. This assumption dramatically improves performance. This function will crash with an error 
 // if any checks fail. 
-fn get_output_info(
-  writer_addr: Address,
+fn check_outputs(
   req_outputs: List<RequiredContractOutput>,
   outputs: List<Output>,
 ) -> Bool {
@@ -251,7 +220,8 @@ fn get_output_info(
     ) -> {
       let RequiredContractOutput{
         req_value,
-        req_datum
+        req_datum,
+        writer_addr
       } = contract_output
 
       // Check if this output is the next required contract output.
@@ -261,14 +231,12 @@ fn get_output_info(
           req_value == (value.to_dict(val) |> dict.to_list(_))
         )
 
-        get_output_info(
-          writer_addr,
+        check_outputs(
           rest_contract_outs,
           rest_outs
         )
       } else {
-        get_output_info(
-          writer_addr,
+        check_outputs(
           req_outputs,
           rest_outs
         )
@@ -287,26 +255,16 @@ pub fn valid_address_update(
   inputs: List<Input>,
   outputs: List<Output>,
   redeemers: Dict<ScriptPurpose,Redeemer>,
-  options_script_hash: ScriptHash,
-  proxy_hash: ScriptHash,
-  upper_bound: PosixTime
-) -> Address {
-  let (writer_addr,req_outputs) = get_input_info(
-    options_script_hash,
+  options_script_credential: Credential,
+  proxy_hash: ScriptHash
+) -> Bool {
+  let req_outputs = get_input_info(
+    options_script_credential,
     proxy_hash,
-    upper_bound,
     inputs,
     dict.to_list(redeemers),
-    (None,[])
+    []
   )
 
-  when writer_addr is {
-    None -> error @"No address update inputs found"
-    Some(x) -> {
-      // This has its own error messages.
-      expect True = get_output_info(x, req_outputs, outputs)
-
-      x // Return the writer's address so that approval can be checked.
-    }
-  }
+  check_outputs(req_outputs, outputs)
 }

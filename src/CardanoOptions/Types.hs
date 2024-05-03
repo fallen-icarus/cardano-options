@@ -1,13 +1,9 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -22,7 +18,7 @@ module CardanoOptions.Types
   , TradingPairBeacon(..)
   , OfferBeacon(..)
   , AskBeacon(..)
-  , PremiumAssetBeacon(..)
+  , PremiumBeacon(..)
   , Terms(..)
   ) where
 
@@ -283,20 +279,20 @@ instance Pretty AskBeacon where
 makeFieldLabelsNoPrefix ''AskBeacon
 
 -------------------------------------------------
--- PremiumAssetBeacon
+-- PremiumBeacon
 -------------------------------------------------
 -- | A wrapper around the token name for the beacon associated with that premium asset.
-newtype PremiumAssetBeacon = PremiumAssetBeacon { unPremiumAssetBeacon :: PV2.TokenName }
+newtype PremiumBeacon = PremiumBeacon { unPremiumBeacon :: PV2.TokenName }
   deriving (Show,Eq)
   deriving newtype (PV2.ToData,PV2.FromData,PV2.UnsafeFromData)
 
-instance ToJSON PremiumAssetBeacon where
-  toJSON (PremiumAssetBeacon (PV2.TokenName tokName)) = toJSON $ T.pack $ show $ PV2.PubKeyHash tokName 
+instance ToJSON PremiumBeacon where
+  toJSON (PremiumBeacon (PV2.TokenName tokName)) = toJSON $ T.pack $ show $ PV2.PubKeyHash tokName 
 
-instance Pretty PremiumAssetBeacon where
-  pretty (PremiumAssetBeacon (PV2.TokenName tokName)) = pretty $ T.pack $ show $ PV2.PubKeyHash tokName 
+instance Pretty PremiumBeacon where
+  pretty (PremiumBeacon (PV2.TokenName tokName)) = pretty $ T.pack $ show $ PV2.PubKeyHash tokName 
 
-makeFieldLabelsNoPrefix ''PremiumAssetBeacon
+makeFieldLabelsNoPrefix ''PremiumBeacon
 
 -------------------------------------------------
 -- Terms
@@ -308,5 +304,11 @@ data Terms = Terms
   , expiration :: PV2.POSIXTime
   } deriving (Generic,Show,Eq)
 
+instance ToJSON Terms where
+  toJSON Terms{..} =
+    object [ "premium" .= premium
+           , "strike_price" .= strikePrice
+           , "expiration" .= PV2.getPOSIXTime expiration
+           ]
 makeFieldLabelsNoPrefix ''Terms
 PlutusTx.unstableMakeIsData ''Terms

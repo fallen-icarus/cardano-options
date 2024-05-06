@@ -21,6 +21,7 @@ template scripts to come up with your own remote node template scripts for carda
 - [Creating Reference Scripts](#creating-reference-scripts)
 - [Creating a Proposal UTxO](#creating-a-proposal-utxo)
 - [Closing a Proposal UTxO](#closing-a-proposal-utxo)
+- [Updating a Proposal UTxO](#updating-a-proposal-utxo)
 - [Purchasing a Proposal UTxO](#purchasing-a-proposal-utxo)
 - [Updating a Payment Address](#updating-a-payment-address)
 - [Executing an Active UTxO](#executing-an-active-utxo)
@@ -125,7 +126,7 @@ cabal build exe:cardano-options
 ```
 
 The `cardano-options` CLI program should now be at
-`dist-newstyle/build/x86_64-linux/ghc-9.6.4/cardano-options-1.0.0.0/x/cardano-options/build/cardano-options/cardano-options`.
+`dist-newstyle/build/x86_64-linux/ghc-9.6.5/cardano-options-1.0.0.0/x/cardano-options/build/cardano-options/cardano-options`.
 Move the program to somewhere in your `$PATH`.
 
 All `cardano-options` subcommands have an associated `--help` option. The functionality is meant to
@@ -415,7 +416,8 @@ precision is needed, use a fraction. `expiration` must be in POSIXTime in millis
 
 ##### Building the transaction
 The invalid-hereafter bound must be set to the earliest expiration among all of the Proposal UTxO's
-`possibleTerms`.
+`possibleTerms`. You can use `cardano-options convert-time` CLI to convert between POSIXTime and
+slot numbers.
 
 To see how to build the transaction using a local node, refer
 [here](scripts/local-node/create-proposal.sh).
@@ -478,11 +480,24 @@ cardano-options redeemers options-script manage-proposal \
   --out-file options_redeemer.json
 ```
 
+Closing proposal UTxOs requires using the `CreateCloseOrUpdateProposals` proposal beacon redeemer.
+
 ##### Building the transaction
 The writer's staking credential must approve the transaction.
 
 To see how to build the transaction using a local node, refer
 [here](scripts/local-node/close-proposal.sh).
+
+## Updating Proposal UTxOs
+
+The steps to update Proposal UTxOs are exactly the same as closing them, except you will need to
+create the new outputs. All redeemers are the same.
+
+When building the transaction, you will also need to specify the invalid-hereafter bound, and set it
+to the earliest expiration among your new ProposalDatums.
+
+By cross-referencing the [creation script](scripts/local-node/create-proposal.sh) and the [closing
+script](scripts/local-node/close-proposal.sh), you can easily come up with your own update script.
 
 ## Purchasing a Proposal UTxO
 
@@ -619,6 +634,8 @@ cardano-options datums payment \
 ```
 
 ##### Building the transaction
+Make sure to keep the Key NFT for each proposal purchased!
+
 To see how to build the transaction using a local node, refer
 [here](scripts/local-node/purchase-proposal.sh).
 
@@ -778,7 +795,8 @@ cardano-options datums payment \
 This datum must be stored at the required payment address with the required amount of the ask asset.
 
 ##### Building the transaction
-You need to set the invalid-hereafter of this transaction to the `$expirationSlot` variable.
+You need to set the invalid-hereafter of this transaction to the `$expirationSlot` variable. If you
+are executing multiple contracts in a single transaction, the earliest expiration should be used.
 
 To see how to build the transaction using a local node, refer
 [here](scripts/local-node/execute-contract.sh). 
@@ -842,7 +860,8 @@ activeContractId="${activeBeaconPolicyId}.${contractIdName}"
 ```
 
 ##### Building the transaction
-You need to set the invalid-before of this transaction to the `$expirationSlot` variable.
+You need to set the invalid-before of this transaction to the `$expirationSlot` variable. If you are
+closing multiple expired contracts, the latest expiration should be used.
 
 The writer's staking credential must approve the transaction.
 
@@ -906,9 +925,12 @@ This query can also work on plutus script addresses.
 All possible queries for Proposal UTxOs are organized under the `cardano-options query proposals`
 command.
 
-If a target DApp address is not specified, then at least one asset filter must be used. Filters can
-be combined to create more complicated filters. For example, this will only return Proposal UTxOs
-using the specified assets.
+If a target DApp address is not specified, then at least one asset filter must be used. It is not
+possible to query *all* Proposal UTxOs. If you believe this would be a useful feature, feel free to
+open an issue.
+
+Filters can be combined to create more complicated filters. For example, this will only return
+Proposal UTxOs using the specified assets.
 
 ```bash
 cardano-options query proposals \
@@ -924,8 +946,11 @@ cardano-options query proposals \
 
 All possible queries for Active UTxOs are organized under the `cardano-options query actives` command.
 
-If a target DApp address is not specified, then at least one asset filter must be used. Filters can
-be combined to create more complicated filters. 
+If a target DApp address is not specified, then at least one asset filter must be used. It is not
+possible to query *all* Active UTxOs. If you believe this would be a useful feature, feel free to
+open an issue.
+
+Filters can be combined to create more complicated filters. 
 
 The `contract-id` field is optional. If you use it, the query will only return the Active UTxO with that
 Contract ID. When this field is used, there can never be more than one result. It can return nothing if
@@ -933,6 +958,5 @@ there is no Active UTxO with that Contract ID.
 
 ### Querying the Current Time
 
-Certain actions require specifying a start time. This can always be set to the most recent slot
-time. You can query the most recent slot number using the `cardano-options query current-slot`
-command.
+Certain actions require knowing the current time. You can query the most recent slot number using
+the `cardano-options query current-slot` command.

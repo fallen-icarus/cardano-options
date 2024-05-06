@@ -71,7 +71,7 @@ strategies and risk-management techniques.
 new contract. Whoever controls this Key NFT is able to execute the associated options contract. This
 Key NFT can be freely traded on *any* DApp, especially those meant to act as secondary markets for
 financial assets.
-- **A Single DApp Address for each writer** - every writer gets their own personal DApp address.
+- **A Single DApp Address for Each Writer** - every writer gets their own personal DApp address.
 All contracts created by this writer are held in their personal address. This makes it very easy for
 front-ends to integrate Cardano-Options as well as for writers to manage the stake/voting power for
 assets in the DApp.

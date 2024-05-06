@@ -582,9 +582,7 @@ validator(proxy_hash: ScriptHash, options_script_hash: ScriptHash, active_beacon
         //       2. The expiration must be >= invalid-hereafter
         //       3. The premium must be > 0
         //    n) The possible_terms list cannot be empty.
-        //    o) writer_credential must match the stake credential used in in the destination
-        //       options address.
-        //    p) offer_asset /= ask_asset
+        //    o) offer_asset /= ask_asset
         // 4) All outputs with proposal beacons must contain exactly the contract_deposit and the
         //    offer_quantity amount of the offer_asset. No other assets are allowed in the output.
         //

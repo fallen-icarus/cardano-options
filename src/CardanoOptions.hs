@@ -203,8 +203,8 @@ instance PV2.FromData PaymentDatum where
 data OptionsRedeemer
   -- | Close or update a Proposal UTxO.
   = CloseOrUpdateProposal
-  -- | Purchase a options contract by converting a Proposal UTxO into an Active UTxO. The
-  -- `desiredTermsIndex` is identifies which `Terms` the buyer is purchasing.
+  -- | Purchase an options contract by converting a Proposal UTxO into an Active UTxO. The
+  -- `desiredTermsIndex` identifies which `Terms` the buyer is purchasing.
   | PurchaseContract { desiredTermsIndex :: Integer }
   -- | Execute an active options contract.
   | ExecuteContract

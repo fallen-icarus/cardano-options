@@ -778,6 +778,7 @@ fn check_contract_output(
   )
 
   if offer_asset == (#"",#"") { 
+    // This can be larger in case more ada is needed.
     actual_offer_quantity >= offer_quantity + contract_deposit
   } else { 
     and {

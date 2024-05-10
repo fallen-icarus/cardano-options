@@ -35,7 +35,7 @@ module CardanoOptions
   , proposalBeaconScriptHash
   , proposalBeaconCurrencySymbol
 
-    -- * BeaconNames
+    -- * Beacon Names
   , genContractId
   , genOfferBeaconName
   , genAskBeaconName

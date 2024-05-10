@@ -1,7 +1,11 @@
 # Cardano-Options
 
-A [p2p-DeFi protocol](https://github.com/zhekson1/CSL-DeFi-Protocols) for writing, buying, and
-trading American-style *covered* options contracts on the Cardano Settlement Layer.
+A p2p-DeFi protocol for writing, buying, and trading American-style *covered* options contracts on
+the Cardano Settlement Layer.
+
+As with all [p2p-DeFi protocol](https://github.com/zhekson1/CSL-DeFi-Protocols), all users maintain
+full custody, delegation control, and voting control of their assets at all times. No batchers are
+required.
 
 > Knowledge of basic Haskell syntax and `cardano-cli` usage is recommended. 
 
@@ -34,23 +38,40 @@ be found [here](./Benchmarks.md).
 
 ## Abstract
 
-Cardano-Options is a p2p-DeFi protocol for writing, buying, and trading American-style *covered*
-options contracts on the Cardano Settlement Layer (CSL). Users maintain delegation control of assets
-at all times. Every aspect of the options contract is fully customizable (eg, which asset will be
-offer, used as the premium, etc). Once purchased, the protocol will trustlessly enforce the
-specified terms. Finally, as with all other p2p-DeFi protocols, this DApp can be trustlessly
-composed with all other Cardano DApps.
+Cardano-Options is a p2p-DeFi protocol for American-style *covered* options contracts that are
+naturally enforced by the Cardano Settlement Layer (CSL). Users maintain delegation control and
+voting control of assets at all times. Every aspect of the options contract is fully customizable
+(eg, which asset will be offered, which asset must be used to pay the premium, the strike price,
+etc). Once purchased, the protocol will trustlessly enforce the specified terms. Buyers of options
+contracts can freely trade the active contracts on secondary markets. Finally, this protocol can be
+trustlessly composed with all other Cardano DApps.
 
 ## Motivation
 
 Options contracts play a vital role in the economy by providing a mechanism for risk management,
 improving market efficiency, and enhancing price discovery. This is especially important for an
 endogenous p2p economy that does not rely off-chain price feeds. Currently, there are very few
-options markets on Cardano. Those that do exist usually require users to sacrifice custody,
-delegation control, and voting control of all assets used for the options contracts. Furthermore,
-direct composability with other DApps is rarely considered. These factors increase the risk for all
-users who wish to interact with the options market *and* significantly hinder the market's economic
-potential.
+options markets on Cardano. Those that do exist (usually) have the following limitations:
+
+- Users are required to sacrifice custody, delegation control, and voting control of all assets used
+for the options contracts. Not only does this increase the risk of theft for users (pooled assets
+attracts more hackers than distributed assets), but this is also an existential risk for both
+Proof-of-Stake blockchains such as Cardano, and decentralized governance.
+- Very little support (if any) for direct composability with other DApps. Lack of composability
+across core DeFi protocols can create systemic risks to the DeFi economy. At best, these risks
+create an unhealthy economy while at worst, they can easily cascade into economic recessions. (For
+an elaboration of this argument, see the [Cardano-Loans
+README](https://github.com/fallen-icarus/cardano-loans/blob/v1.0.0.0rc/README.md#no-trustless-composability-with-other-dapps).)
+- Restrictions on the feature set supported by the options trading market. For an economy to reach
+its full potential, users must be able to express *all* possible preferences exactly. Any deviation
+from their true preferences will create economic distortions. For example, would Alice rather have
+the premium paid in ada or a stablecoin? Requiring Alice to accept ada instead of the stablecoin for
+the premium payment forces her to accept more risk than she otherwise would. As a result, Alice may
+be less active in the DeFi economy just because she wants to minimize her risk. By providing more
+customizable features, users can manage risks using other methods than just *abstaining from DeFi*.
+
+For DeFi to reach its full potential, there is a need for an options trading protocol without any of
+the above limitations.
 
 ## The Cardano-Options Protocol
 
@@ -60,31 +81,39 @@ beacon tokens, Cardano-Options does not have any of the same limitations as cont
 ### Supported Features
 
 - **Native Support for All Assets** - all assets are directly supported as offered assets, asked
-assets, and premium assets.
+assets, and premium assets. For example, Alice can offer an options contract that swaps ADA -> AGIX
+and have the premium paid in DJED.
 - **Direct Payments to Writers** - buyers make payments directly to addresses specified by the
 writers. This means writers do not need to wait until after the contract finishes to claim the
-proceeds from the premium payments.
+proceeds from the premium payments. Additionally, when a contract is executed, the proceeds *also*
+go directly to the writer.
 - **Assortment of Possible Terms** - when a writer creates a new contract for sale, they can offer a
 selection of terms for the buyer to choose from. This enables writers to use more advanced trading
-strategies and risk-management techniques.
+strategies and risk-management techniques. For example, when Alice wants to create an options contract for
+swapping 100 ADA to AGIX with a premium paid in DJED, she can let the buyer pick either 1) a premium
+of 0.80 DJED, an expiration in 1 month, and a strike price of 0.5 AGIX/ADA, or 2) a premium of 1.10
+DJED, an expiration in 3 months, and a strike price of 0.7 AGIX/ADA. *She can set all terms exactly
+how she likes!* No algorithms can force her to sell terms she doesn't want.
 - **Tradable Contracts** - when a buyer purchases a new contract, they are given a Key NFT for that
 new contract. Whoever controls this Key NFT is able to execute the associated options contract. This
 Key NFT can be freely traded on *any* DApp, especially those meant to act as secondary markets for
 financial assets.
-- **A Single DApp Address for Each Writer** - every writer gets their own personal DApp address.
-All contracts created by this writer are held in their personal address. This makes it very easy for
+- **A Single DApp Address for Each Writer** - every writer gets their own personal DApp address. All
+contracts created by this writer are held in their personal DApp address. This makes it very easy for
 front-ends to integrate Cardano-Options as well as for writers to manage the stake/voting power for
-assets in the DApp.
+assets currently locked in active contracts.
 - **Efficient Off-chain Sorting of Contracts** - by using beacons tokens, users can easily query the
 protocol for any information they may want. These beacon queries can even be combined to create more
 complicated queries. For example, buyers can see all current contracts for sale that are offering
-DJED, and asking for a premium paid in ADA. 
+DJED *and* asking for a premium paid in ADA. 
 - **Democratic Upgradability** - users decide if and when to upgrade to a new version of the DApp.
 No one can decide this for them, or force them to move to a new version (eg, by freezing all
 functionality for the current version).
 - **Full Composability** - this protocol is natively composable with all other DeFi DApps. It can
 even be composed with itself: an options writer can close an expired contract and immediately create
-a new contract for sale in a single transaction.
+a new contract for sale in a single transaction. Another possible composition is buying one options
+contract and creating one to sell in a single transaction. These compositions allow for very
+advanced trading strategies while keeping risk to an absolute minimum.
 
 ## Specification
 
@@ -93,10 +122,10 @@ high-level aspects, feel free to skip to the next [section](#benchmarks-and-fee-
 
 ### The Writer's Address
 
-Writer each create a unique "options" address - this is where all contract purchases take place *and*
-where all collateral is kept until the contract is either executed or expired. As is common in
-*distributed dApps*, all such options addresses use the same validator script for the payment
-credential, and a unique, user-defined staking key or script for the staking credential.
+Writers each create a unique "options" address - this is where all contract purchases take place
+*and* where all locked assets are kept until the contract is either executed or expired. As is
+common in *distributed dApps*, all such options addresses use the same validator script for the
+payment credential, and a unique, user-defined staking key or script for the staking credential.
 Owner-related actions are delegated to the staking credential *by* the validator script, so the user
 maintains full control of all assets at the address. 
 
@@ -109,7 +138,7 @@ Since Cardano-Options has buyers make payments directly to addresses specified b
 must be taken when the specified address uses a payment plutus script. This is because the protocol
 enforces a specific datum with contract payments in order to guarantee uniqueness of outputs - this
 is currently the cheapest option for preventing double satisfaction. If the payments with this
-enforced datum are sent to an address that requires a different datum, the payment can be locked
+enforced datum are sent to an address that requires a different datum, the payment could be locked
 forever.
 
 To address this issue, Cardano-Options uses the same Proxy Script as Cardano-Loans. The proxy script
@@ -131,16 +160,16 @@ Ultimately, the protocol does *not* need to know the current time; it only needs
 certain time has, or has not, passed.
 
 This is where the validity intervals come in. A smart contract will only ever be run if the validity
-interval is true. Therefore, if the invalid-before is set to slot 10 and the smart contract is being
+interval is true. Therefore, if the `invalid-before` is set to slot 10 and the smart contract is being
 executed, then the smart contract knows that slot 10 is guaranteed to have already passed. Likewise,
-if the invalid-hereafter is set to slot 20 and the smart contract is being executed, then the smart
+if the `invalid-hereafter` is set to slot 20 and the smart contract is being executed, then the smart
 contract knows that slot 20 has definitely *not* passed yet.
 
 Therefore, this protocol uses the following general rules:
-- If you need to prove to the smart contract that time `y` has passed, set the invalid-before bound
+- If you need to prove to the smart contract that time `y` has passed, set the `invalid-before` bound
 to `y`.
 - If you need to prove to the smart contract that time `x` has *not* passed yet, set the
-invalid-hereafter bound to `x`.
+`invalid-hereafter` bound to `x`.
 
 ### Protocol Phases and Beacons
 
@@ -191,8 +220,7 @@ the contract, and which direction the trade is going in. It has the exact same n
 associated Proposal UTxO's Trading Pair Beacon.
 - *Contract ID Beacon* - an active phase beacon token uniquely representing this options contract.
 Its token name is:  `sha2_256( proposal_utxo_tx_hash ++ proposal_utxo_output_index )`. There are two
-of these for each contract: one is stored with the contract and one is the NFT that can be freely
-traded among buyers. This Contract ID token pair is called the "Lock & Key NFTs".
+of these for each contract.
 
 The beacon names for each phase are deliberately the same to simplify the off-chain querying.
 
@@ -229,10 +257,10 @@ The options spending smart contract hash is hard-coded into *all* of the other s
 enforce the use of the proper payment credential for all options addresses.
 
 The address observer smart contract hash is hard-coded into the active smart contract so that the
-active smart contract can force the use of the proper observer logic. The, the active smart contract
-hash is hard-coded into the proposal smart contract so that it can force the use of the proper
-active smart contract. The active smart contract hash embodies the observer hash hard-coded into
-it so there is no need to also hard-code the observer hash into the proposal smart contract. It
+active smart contract can force the use of the proper observer logic. Then, the active smart
+contract hash is hard-coded into the proposal smart contract so that it can force the use of the
+proper active smart contract. The active smart contract hash embodies the observer hash hard-coded
+into it so there is no need to also hard-code the observer hash into the proposal smart contract. It
 looks like this:
 
 ```mermaid
@@ -241,16 +269,16 @@ flowchart LR
     2[Active] --> 3{Proposal};
 ```
 
-The protocol's complementary proxy smart contract is hard-coded into the address update observer
-smart contract and the proposal smart contract so that payment addresses can be checked for proper
-configurations.
+The protocol's complementary proxy smart contract is hard-coded into both the address update
+observer smart contract and the proposal smart contract so that payment addresses can be checked for
+proper configurations.
 
 The redeemers and datums are introduced here:
 
 ##### Options Spending Smart Contract Datums
 
-A DApp UTxO's datum can either be a `ProposalDatum`, or an `ActiveDatum`. `POSIXTime`
-is always in milliseconds.
+A protocol's UTxO's datum can either be a `ProposalDatum`, or an `ActiveDatum`. `POSIXTime` is
+always in milliseconds.
 
 ```haskell
 -- | The terms that an options' writer can vary within the same Proposal UTxO.
@@ -331,7 +359,8 @@ data OptionsRedeemer
   -- | Close or update a Proposal UTxO.
   = CloseOrUpdateProposal
   -- | Purchase an options contract by converting a Proposal UTxO into an Active UTxO. The
-  -- `desiredTermsIndex` identifies which `Terms` the buyer is purchasing.
+  -- `desiredTermsIndex` identifies which `Terms` the buyer is purchasing; it is a 0-based index
+  -- into the `possibleTerms` list in the associated Proposal UTxO.
   | PurchaseContract { desiredTermsIndex :: Integer }
   -- | Execute an active options contract.
   | ExecuteContract
@@ -365,7 +394,8 @@ data ProposalBeaconsRedeemer
 ```haskell
 data ActiveBeaconsRedeemer
   -- | Create some Active UTxOs (1 or more) by buying Proposal UTxOs. The CurrencySymbol is the 
-  -- policy id for the proposal beacons.
+  -- policy id for the proposal beacons. The options spending script enforces the use of the 
+  -- proper CurrencySymbol.
   = PurchaseExecuteOrCloseExpiredContracts { proposalPolicyId :: CurrencySymbol }
   -- | Burn any beacons. This is only used to burn unused Key NFTs.
   | BurnActiveBeacons
@@ -374,7 +404,8 @@ data ActiveBeaconsRedeemer
 By using a single redeemer for purchases, executions, and closing expired contracts, it is possible
 to securely compose all three actions in a single transaction. If the actions used separate
 redeemers, each transaction using the active beacon smart contract would be forced to be dedicated
-to that individual action.
+to that individual action. It is for this reason that burning unused Key NFTs cannot occur in the
+same transaction where contracts are purchased, executed, or closed.
 
 ##### Payment Datum
 
@@ -383,7 +414,7 @@ double-satisfaction.
 
 ```haskell
 -- | The `CurrencySymbol` is always the active beacon policy id, and the `TokenName` is always
--- the Loan ID this payment output corresponds to.
+-- the Contract ID this payment output corresponds to.
 newtype PaymentDatum = PaymentDatum (CurrencySymbol,TokenName)
 ```
 
@@ -392,7 +423,7 @@ the `TokenName` may not be enough to guarantee uniqueness.
 
 ### Proposal UTxO Actions
 
-Writers can create/update/close multiple Proposal UTxOse in a single transaction; each UTxO created
+Writers can create/update/close multiple Proposal UTxOs in a single transaction; each UTxO
 can have different terms.
 
 ##### Creating Proposal UTxOs
@@ -430,17 +461,16 @@ of each:
     - `paymentAddress` must use either a payment pubkey, or the proxy script as the payment
     credential and a valid staking credential
     - `possibleTerms` must not be empty
-    - For all `Terms` is `possibleTerms`:
-        - `strikePrice` numerator > 0 and denominator > 0
-        - `expiration` >= invalid-hereafter of this transaction
+    - For all `Terms` in `possibleTerms`:
+        - `strikePrice` numerator must be > 0 and denominator must be > 0
+        - `expiration` >= `invalid-hereafter` of this transaction
         - `premium` > 0
     - `offerAsset` != `askAsset`
 - All outputs with proposal beacons must have *exactly* the `contractDeposit` amoung of ada and the
   `offerQuantity` amount of the `offerAsset`. No other assets are allowed in the output.
 
-
 In order to help prevent creating a bunch of expired contracts to clutter the beacon queries, all
-contract expirations must be set to a time that has not passed yet. The invalid-hereafter bound is
+contract expirations must be set to a time that has not passed yet. The `invalid-hereafter` bound is
 used to prove that time x has not passed yet, and all expirations must be >= x. This is how the
 smart contract can prove that all of the newly created options contracts are not already expired.
 
@@ -480,12 +510,12 @@ to be executed.
 ##### Updating Proposal UTxOs
 
 Updating Proposal UTxOs in-place can be done regardless of whether beacons must be changed. The
-steps are identical to closing Proposal UTxOs, except you know create Proposal UTxO outputs as well.
+steps are identical to closing Proposal UTxOs, except you now create Proposal UTxO outputs as well.
 Since there are now outputs, the outputs will be checked by the proposal beacon script and must
 comply to the same requirements as when creating Proposal UTxOs.
 
 If no beacons need to be minted/burned, the proposal beacon script must be executed as a staking
-script using `CreateCloseOrUpdateProposals`. If beacons do need to be minted/burned, then the
+script using `CreateCloseOrUpdateProposals`. If beacons *do* need to be minted/burned, then the
 proposal beacon script must be executed as a minting policy using the same redeemer.
 
 ##### Purchasing Proposal UTxOs
@@ -544,7 +574,9 @@ following characteristics:
 proposal beacon smart contract as a minting policy with `BurnProposalBeacons` *or* the proposal
 beacon smart contract must be executed with `CreateCloseOrUpdateProposals` (can be staking or
 minting execution)
-- The active beacon smart contract must mint only the beacons required for the new contract outputs.
+- The active beacon smart contract must mint only the beacons required for the new outputs.
+
+Buyers can purchase contracts from multiple different sellers in the same transaction.
 
 There is no need to check whether the purchased contracts are expired since buyers are incentivized
 NOT to buy expired contracts.
@@ -559,9 +591,9 @@ transaction.
 ##### Executing Active UTxOs
 
 At a high-level, executing an Active UTxO entails proving to the protocol the contract is indeed
-still active, sending the asked asset to the writer's payment address, and claiming the offered
-asset stored with the contract. This action requires both the Lock and the Key NFTs for this
-contract.
+still active, sending the required amount of the asked asset to the writer's payment address, and
+claiming the offered asset stored with the contract. This action requires both the Lock and the Key
+NFTs for the contract being executed.
 
 At a low-level, all of the following must be true:
 
@@ -570,18 +602,18 @@ At a low-level, all of the following must be true:
     - The input must be spent using the `ExecuteContract` spending redeemer.
     - The input must have an `ActiveDatum`.
     - The input must have the required active beacons.
-    - The contract's expiration must be >= invalid-hereafter of this transaction.
+    - The contract's expiration must be >= `invalid-hereafter` of this transaction.
     - Both the Lock and Key NFTs for this contract must be burned.
     - All other active beacons attached to the contract must also be burned.
     - There must be a corresponding ask payment output with the following characteristics:
         - It must be locked at the payment address specified by the contract
         - It must contain the `contractDeposit` amount of ada + the required amount of the `askAsset`
-        which is determined by the `strikePrice`
+        which is determined by the `strikePrice` and `offerQuantity`
         - It must contain an inline `PaymentDatum` with the active beacon policy id as the
         `CurrencySymbol` and the new contract's Contract ID beacon token name as the `TokenName`
 - The active beacon smart contract cannot mint/burn any extra active beacons.
 
-The invalid-hereafter flag is used to prove that the expiration time has not actually passed. When
+The `invalid-hereafter` flag is used to prove that the expiration time has not actually passed. When
 executing multiple contracts, this flag should be set to the earliest expiration time.
 
 A user is able to execute multiple contracts in a given transaction as long as they control all the
@@ -590,8 +622,8 @@ required Key NFTs.
 ##### Closing Expired Active UTxOs
 
 At a high-level, closing an expired Active UTxO entails proving to the script that the contract is
-indeed expired, and burning all beacons. This action only requires the Lock NFT, however, the writer
-must approve this transaction.
+indeed expired, burning all beacons, and getting approval from the writer. This action only requires
+the Lock NFT.
 
 At a low-level, all of the following must be true for all contracts being closed:
 
@@ -600,13 +632,12 @@ At a low-level, all of the following must be true for all contracts being closed
     - The input must be spent using the `CloseExpiredContract` spending redeemer.
     - The input must have an `ActiveDatum`.
     - The input must have the required active beacons.
-    - The contract's expiration must be <= invalid-before of this transaction.
+    - The contract's expiration must be <= `invalid-before` of this transaction.
     - The options address' staking credential must approve the transaction.
     - All active beacons attached to the contract must be burned.
-    - The active beacon smart contract cannot mint/burn any extra active beacons.
 - The active beacon smart contract cannot mint/burn any extra active beacons.
 
-The invalid-before flag is used to prove that the expiration time has actually passed. When closing
+The `invalid-before` flag is used to prove that the expiration time has actually passed. When closing
 multiple expired contracts, this flag should be set to the latest expiration time.
 
 ##### Updating Payment Addresses
@@ -620,7 +651,7 @@ At a low-level, all of the following must be true for all contracts updated:
 `ObserveAddressUpdate`.
 - For all contract inputs:
     - It must have an `ActiveDatum`
-    - It origin address' staking credential must signal approval
+    - The origin address' staking credential must signal approval
     - It must be spent using `UpdatePaymentAddress` where the `newAddress` is the new address to be
       used and the `depositIncrease` is the amount of ada added for a larger minUTxOValue
     - The `newAddress` must either use a payment pubkey, or the proxy script as the payment credential
@@ -628,16 +659,16 @@ At a low-level, all of the following must be true for all contracts updated:
     - The `depositIncrease` must be >= 0
     - There must be a corresponding output to the input's origin address with:
         - The same exact value as the input + the `depositIncrease` amount of ada
-        - The `ActiveDatum` must be exactly the same as the inputs except:
+        - The `ActiveDatum` must be exactly the same as the input's except:
             - `paymentAddress` == `newAddress`
             - `contractDeposit` == starting `contractDeposit` + `depositIncrease`
 
 There is no need to check if the contract is expired since the writer is already incentivized to
 close the expired contract instead of updating the address.
 
-There is also no need to check for the beacons to prevent updating invalid Active UTxOs. These
-invalid UTxOs belong to the writer anyway, and this observer script will still require the proper
-output at the writer's address. There is no incentive for writers to update addresses of invalid
+There is also no need to check for the beacons. UTxOs with an `ActiveDatum` but no beacons are
+invalid UTxOs and belong to the writer anyway. This observer script will still require the proper
+outputs at the writer's address. There is no incentive for writers to update addresses of invalid
 Active UTxOs.
 
 ## Benchmarks and Fee Estimations (YMMV)
@@ -674,26 +705,57 @@ pressure from regulators for corporations to use at least a multisig for all DeF
 Cardano-Options is maximally composable not only with other DApps, but also with itself. For
 example, it is possible to create a new proposal contract for sale, buy another proposal contract,
 execute an active contract, close an expired active contract, and update the payment address for an
-active contract, all in one transaction. The total transaction fee for this composition is only 0.7
-ADA.
+active contract, *all in one transaction*. The total transaction fee for this composition is only
+0.7 ADA!
 
 ### Direct Payments
 
 Instead of having to wait until the contracts finish, premium payment and execution payments are
 made directly to writers.
 
-### Assortment of Possible Terms Per Proposal
+### Maximum Expressiveness
 
-When a writer creates a new proposal contract for sale, they can specify several different possible
-pairings of expirations, strike prices, and premiums. For example, the writer can say "you can have
-expiration x with strike price y and premium z, or you can have expiration a with strike price b and
-premium c." Then, when the buyer wishes to purchase the new contract, they tell the protocol which
-terms they are buying. The protocol will enforce the selected terms for the active phase. This
-feature enables advanced trading strategies for professional traders.
+Writers can configure *every* part of the contract:
+
+- Which asset will the premium be paid in?
+- Which asset will be offered upon execution?
+- Which asset must be given upon execution?
+- Where will payments go?
+- What will the strike price be?
+- What will the expiration be?
+- What will the premium be?
+
+Writers can even create a contract with an assortment of possible answers for the last three
+questions. Because of this, writers will be more likely to find buyers for their contracts without
+having to lock up extra units of the underlying assets (which would be the case if a separate
+Proposal UTxO was needed for each set of terms).
+
+This flexibility can result in a very complex options trading market that no other DApp can compare
+to. And Cardano-Options achieves this without sacrificing any of the core principles of p2p-DeFi
+protocols.
+
+### Advanced Beacon Querying
+
+Despite Cardano-Options supporting an abundance of possible configurations, it is still very easy
+for users to only see contracts for terms they are interested in, thanks to the beacons. Perhaps Bob
+only wants to see contracts that convert ADA -> AGIX. He can query the TradingPair beacon to only
+see these contracts. The proposal TradingPair beacon will show contracts for sale while the active
+TradingPair beacon will show active contracts for that trading pair. 
+
+Meanwhile, Mike may want to see all contracts for sale that are offering ada and have a premium paid in
+DJED. He can see exactly these contracts by querying *both* the proposal Offer beacon for ada and the
+proposal Premium beacon for DJED.
+
+### Native Support For Secondary Options Markets
+
+Because all contracts get a Key NFT that is freely tradable, it is trivial for secondary markets to
+form around Cardano-Options. These secondary markets can be on anything from other DApps to
+centralized exchanges. These secondary markets will help Cardano-Options to reach its full potential
+as a primary market for decentralized options trading.
 
 ## Conclusion
 
-Cardano-Options is the latest member of the [p2p-DeFi protocol
-family.](https://github.com/zhekson1/CSL-DeFi-Protocols) It enables the formation of a radically
-permissionless and highly composable options market on the CSL, and works synergistically with other
-p2p-DeFi protocols. 
+Cardano-Options is (arguably) the most advanced decentralized options trading DeFi protocol in all
+of crypto. It enables the formation of a radically permissionless and highly composable options
+market on the CSL, and works synergistically with other p2p-DeFi protocols. And best of all, users
+never give up delegation control or voting control of their assets while using the protocol.

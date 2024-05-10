@@ -250,6 +250,7 @@ fn check_outputs(
     _ -> error "Not all required address update outputs found"
   }
 }
+
 // Check all address updates for a writer and return the writer's address used so 
 // that the writer's approval can be checked.
 pub fn valid_address_update(

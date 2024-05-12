@@ -636,6 +636,9 @@ cardano-options datums payment \
 ##### Building the transaction
 Make sure to keep the Key NFT for each proposal purchased!
 
+Also, *make sure the contract outputs and premium outputs are (separately) in the same order as the
+proposal inputs being purchased*.
+
 To see how to build the transaction using a local node, refer
 [here](scripts/local-node/purchase-proposal.sh).
 
@@ -729,6 +732,8 @@ subject to the imprecision of floating-point numbers.
 ##### Building the transaction
 The writer's staking credential must approve the transaction.
 
+*Make sure the address update outputs are in the same order as the address update inputs!*
+
 To see how to build the transaction using a local node, refer
 [here](scripts/local-node/update-payment-address.sh). 
 
@@ -797,6 +802,8 @@ This datum must be stored at the required payment address with the required amou
 ##### Building the transaction
 You need to set the invalid-hereafter of this transaction to the `$expirationSlot` variable. If you
 are executing multiple contracts in a single transaction, the earliest expiration should be used.
+
+*Make sure the execution payment outputs are in the same order as the execution inputs!*
 
 To see how to build the transaction using a local node, refer
 [here](scripts/local-node/execute-contract.sh). 

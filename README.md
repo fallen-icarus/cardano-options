@@ -586,6 +586,15 @@ possible to create Proposal UTxOs in the same transacion where one is purchased.
 this means options traders can create one contract for sale and buy another one in the same
 transaction.
 
+*Purchase outputs must be in the same order as the purchase inputs!* The contract output and premium
+payment output do *not* need to be paired up. The requirements are:
+
+1. Contract1 output must appear before contract2 output.
+2. Premium1 output must appear before premium2 output.
+
+Any ordering that satisfies the above contraints will succeed. You can even have unrelated outputs
+between the required outputs. This ordering restriction helps with performance.
+
 ### Active UTxO Actions
 
 ##### Executing Active UTxOs
@@ -618,6 +627,10 @@ executing multiple contracts, this flag should be set to the earliest expiration
 
 A user is able to execute multiple contracts in a given transaction as long as they control all the
 required Key NFTs.
+
+*Execution payment outputs must be in the same order as the execution inputs!* They do *not* need to
+be paired up. You can even have unrelated outputs between the required outputs. This ordering
+restriction helps with performance.
 
 ##### Closing Expired Active UTxOs
 
@@ -670,6 +683,10 @@ There is also no need to check for the beacons. UTxOs with an `ActiveDatum` but 
 invalid UTxOs and belong to the writer anyway. This observer script will still require the proper
 outputs at the writer's address. There is no incentive for writers to update addresses of invalid
 Active UTxOs.
+
+*Address update outputs must be in the same order as the address update inputs!* They do *not* need
+to be paired up. You can even have unrelated outputs between the required outputs. This ordering
+restriction helps with performance.
 
 ## Benchmarks and Fee Estimations (YMMV)
 

@@ -125,7 +125,7 @@ high-level aspects, feel free to skip to the next [section](#benchmarks-and-fee-
 
 Writers each create a unique "options" address - this is where all contract purchases take place
 *and* where all locked assets are kept until the contract is either executed or expired. As is
-common in *distributed dApps*, all such options addresses use the same validator script for the
+common in *distributed DApps*, all such options addresses use the same validator script for the
 payment credential, and a unique, user-defined staking key or script for the staking credential.
 Owner-related actions are delegated to the staking credential *by* the validator script, so the user
 maintains full control of all assets at the address. 

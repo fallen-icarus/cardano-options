@@ -865,7 +865,7 @@ regressionTest4 = do
           }
       }
 
--- | Close an invalid Active UTxO.
+-- | Close an invalid Active UTxO. Another contract is closed in the same transaction.
 regressionTest5 :: MonadEmulator m => m ()
 regressionTest5 = do
   let -- Writer Info
@@ -1061,9 +1061,90 @@ regressionTest5 = do
           }
       }
 
--- | Close a single expired contract in the same transaction where a Proposal UTxO is created.
+-- | Close an invalid Active UTxO by itself. Invalid-before is not set.
 regressionTest6 :: MonadEmulator m => m ()
 regressionTest6 = do
+  let -- Writer Info
+      writerWallet = Mock.knownMockWallet 1
+      writerPersonalAddr = Mock.mockWalletAddress writerWallet
+      writerPayPrivKey = Mock.paymentPrivateKey writerWallet
+      writerPubKey = LA.unPaymentPubKeyHash $ Mock.paymentPubKeyHash writerWallet
+      writerCred = PV2.PubKeyCredential writerPubKey
+      optionsAddress = toCardanoApiAddress $ PV2.Address 
+        { addressCredential = PV2.ScriptCredential optionsScriptHash
+        , addressStakingCredential = Just $ PV2.StakingHash writerCred
+        }
+
+      -- Buyer Info
+      buyerWallet = Mock.knownMockWallet 2
+      buyerPersonalAddr = Mock.mockWalletAddress buyerWallet
+      buyerPayPrivKey = Mock.paymentPrivateKey buyerWallet
+      -- buyerPubKey = LA.unPaymentPubKeyHash $ Mock.paymentPubKeyHash buyerWallet
+      -- buyerCred = PV2.PubKeyCredential buyerPubKey
+
+      -- Contract Info
+      proposalDatum = unsafeCreateProposalDatum $ NewProposalInfo
+        { offerAsset = OfferAsset (adaSymbol,adaToken)
+        , offerQuantity = 10_000_000
+        , askAsset = AskAsset (testTokenSymbol,"TestToken1")
+        , premiumAsset = PremiumAsset (adaSymbol,adaToken)
+        , contractDeposit = 5_000_000
+        , paymentAddress = toPlutusAddress writerPersonalAddr
+        , possibleTerms =
+            [ Terms
+                { expiration = slotToPosixTime 1000
+                , strikePrice = Fraction (1,1_000_000)
+                , premium = 2_000_000
+                }
+            ]
+        }
+
+      invalidDatum = createActiveDatumFromProposal 0 (TxOutRef (TxId "") 0) proposalDatum 
+
+  -- Initialize scenario
+  References{..} <- initializeReferenceScripts 
+  mintTestTokens writerWallet 10_000_000 [("TestToken1",1000)]
+  mintTestTokens buyerWallet 10_000_000 [("TestToken1",1000)]
+
+  -- Try to buy the Proposal UTxO.
+  void $ transact buyerPersonalAddr [refScriptAddress,optionsAddress] [buyerPayPrivKey] $
+    emptyTxParams
+      { tokens = []
+      , inputs = []
+      , outputs =
+          [ Output
+              { outputAddress = optionsAddress
+              , outputValue = utxoValue 3_000_000 $ mempty
+              , outputDatum = OutputDatum $ toDatum invalidDatum
+              , outputReferenceScript = toReferenceScript Nothing
+              }
+          ]
+      , referenceInputs = []
+      , extraKeyWitnesses = []
+      }
+
+  actives <- txOutRefsAndDatumsAtAddress @ActiveDatum optionsAddress
+  
+  -- Try to close the contract.
+  void $ transact writerPersonalAddr [refScriptAddress,optionsAddress] [writerPayPrivKey] $
+    emptyTxParams
+      { tokens = [ ]
+      , inputs = mconcat
+          [ flip map actives $ \(ref,_) ->
+              Input
+                { inputId = ref
+                , inputWitness = 
+                    SpendWithPlutusReference optionsRef InlineDatum $ 
+                      toRedeemer CloseExpiredContract
+                }
+          ]
+      , referenceInputs = [optionsRef]
+      , extraKeyWitnesses = [writerPubKey]
+      }
+
+-- | Close a single expired contract in the same transaction where a Proposal UTxO is created.
+regressionTest7 :: MonadEmulator m => m ()
+regressionTest7 = do
   let -- Writer Info
       writerWallet = Mock.knownMockWallet 1
       writerPersonalAddr = Mock.mockWalletAddress writerWallet
@@ -1296,4 +1377,5 @@ tests =
   , mustSucceed "regressionTest4" regressionTest4
   , mustSucceed "regressionTest5" regressionTest5
   , mustSucceed "regressionTest6" regressionTest6
+  , mustSucceed "regressionTest7" regressionTest7
   ]

@@ -3,9 +3,11 @@
 A p2p-DeFi protocol for writing, buying, and trading American-style *covered* options contracts on
 the Cardano Settlement Layer.
 
-As with all [p2p-DeFi protocol](https://github.com/zhekson1/CSL-DeFi-Protocols), all users maintain
+As with all [p2p-DeFi protocols](https://github.com/zhekson1/CSL-DeFi-Protocols), all users maintain
 full custody, delegation control, and voting control of their assets at all times. No batchers are
 required.
+
+> Knowledge of basic Haskell syntax and `cardano-cli` usage is recommended. 
 
 The Getting Started instructions can be found [here](./GettingStarted.md), and the benchmarks can
 be found [here](./Benchmarks.md).
@@ -40,7 +42,8 @@ Cardano-Options is a p2p-DeFi protocol for American-style *covered* options cont
 naturally enforced by the Cardano Settlement Layer (CSL). Users maintain delegation control and
 voting control of assets at all times. Every aspect of the options contract is fully customizable
 (eg, which asset will be offered, which asset must be used to pay the premium, the strike price,
-etc). Once purchased, the protocol will trustlessly enforce the specified terms. Buyers of options
+etc). Beacon tokens enable easily filtering the entire options market for contracts using specific
+assets. Once purchased, the protocol will trustlessly enforce the specified terms. Buyers of options
 contracts can freely trade the active contracts on secondary markets. Finally, this protocol can be
 trustlessly composed with all other Cardano DApps.
 
@@ -48,7 +51,7 @@ trustlessly composed with all other Cardano DApps.
 
 Options contracts play a vital role in the economy by providing a mechanism for risk management,
 improving market efficiency, and enhancing price discovery. This is especially important for an
-endogenous p2p economy that does not rely off-chain price feeds. Currently, there are very few
+endogenous p2p economy that does not rely on off-chain price feeds. Currently, there are very few
 options markets on Cardano. Those that do exist (usually) have the following limitations:
 
 - Users are required to sacrifice custody, delegation control, and voting control of all assets used
@@ -66,15 +69,20 @@ from their true preferences will create economic distortions. For example, would
 the premium paid in ada or a stablecoin? Requiring Alice to accept ada instead of the stablecoin for
 the premium payment forces her to accept more risk than she otherwise would. As a result, Alice may
 be less active in the DeFi economy just because she wants to minimize her risk. By providing more
-customizable features, users can manage risks using other methods than just *abstaining from DeFi*.
+customizable features, users can manage risk using other methods than just *abstaining from DeFi*.
+- The protocols are centralized. The common Cardano design pattern today is to have a DApp that is
+ultimately controlled by a multisig; even the minting of the yield tokens is centralized. This
+centralization is an existential risk to both the Dapp itself and also Cardano DeFi as a whole.
 
 For DeFi to reach its full potential, there is a need for an options trading protocol without any of
 the above limitations.
 
 ## The Cardano-Options Protocol
 
-By using the distributed-DApp design (i.e., all users get their own personal DApp addresses) with
-beacon tokens, Cardano-Options does not have any of the same limitations as contemporary DApps.
+By using the distributed-DApp design (ie, all users get their own personal DApp addresses), and
+allowing users to configure all possible parts of the options contract, Cardano-Options does not
+have any of the same limitations as contemporary DApps. And just like with the other p2p-DeFi
+protocols, it favors an endogenous price discovery mechanism.
 
 ### Supported Features
 
@@ -86,13 +94,13 @@ writers. This means writers do not need to wait until after the contract finishe
 proceeds from the premium payments. Additionally, when a contract is executed, the proceeds from the
 contract execution *also* go directly to the writer.
 - **Fully Configurable Contracts** - Alice can set all terms exactly how she likes! No 
-algorithms/oracles can force her to sell terms she doesn't want.
+algorithms/oracles can force her to sell contracts with terms she doesn't actually want.
 - **Assortment of Possible Terms** - when a writer creates a new contract for sale, they can offer a
-selection of terms for the buyer to choose from. This enables writers to use more advanced trading
-strategies and risk-management techniques. For example, when Alice wants to create an options contract 
-for swapping 100 ADA to AGIX with a premium paid in DJED, she can let the buyer pick either 1) a premium
-of 0.80 DJED, an expiration in 1 month, and a strike price of 0.5 AGIX/ADA, or 2) a premium of 1.10
-DJED, an expiration in 3 months, and a strike price of 0.7 AGIX/ADA.
+selection of terms for the buyer to choose from. For example, when Alice wants to create an options
+contract for swapping 100 ADA to AGIX with a premium paid in DJED, she can let the buyer pick either
+a) a premium of 0.80 DJED, an expiration in 1 month, and a strike price of 0.5 AGIX/ADA, or b) a
+premium of 1.10 DJED, an expiration in 3 months, and a strike price of 0.7 AGIX/ADA. This enables
+writers to use more advanced trading strategies and risk-management techniques.
 - **Tradable Contracts** - when a buyer purchases a new contract, they are given a Key NFT for that
 new contract. Whoever controls this Key NFT is able to execute the associated options contract. This
 Key NFT can be freely traded on *any* DApp, especially those meant to act as secondary markets for
@@ -499,7 +507,7 @@ At a low-level, all of the following must be true:
 
 - The options spending smart contract is executed for the Proposal UTxO input using `CloseOrUpdateProposal`.
 - The Proposal UTxO must have a `ProposalDatum`.
-- The option address' staking credential must signal approval.
+- The options address' staking credential must signal approval.
 - If the Proposal UTxO being spent contains proposal beacons:
     - The proposal beacon smart contract must be executed as a minting policy using
     `CreateCloseOrUpdateProposals`.
@@ -739,7 +747,7 @@ active contract, *all in one transaction*. The total transaction fee for this co
 ### Direct Payments
 
 Instead of having to wait until the contracts finish, premium payment and execution payments are
-made directly to writers. Users do not need to return to the DApp address to claim their proceeds.
+made directly to writers. Writers do not need to return to the DApp address to claim their proceeds.
 
 ### Maximum Expressiveness
 
@@ -764,22 +772,22 @@ protocols.
 
 ### Advanced Beacon Querying
 
-Despite Cardano-Options supporting an abundance of possible configurations, it is still very easy
-for users to only see contracts for terms they are interested in, thanks to the beacons. Perhaps Bob
+Despite Cardano-Options supporting an abundance of possible configurations, thanks to the beacons,
+it is still very easy for users to only see contracts for terms they are interested in. Perhaps Bob
 only wants to see contracts that convert ADA -> AGIX. He can query the TradingPair beacon to only
 see these contracts. The proposal TradingPair beacon will show contracts for sale while the active
 TradingPair beacon will show active contracts for that trading pair. 
 
-Meanwhile, Mike may want to see all contracts for sale that are offering ada and ask for a premium
+Meanwhile, Mike may want to see all contracts for sale that are offering ada and require a premium
 paid in DJED. He can see exactly these contracts by querying *both* the proposal Offer beacon for
 ada and the proposal Premium beacon for DJED.
 
 ### Native Support For Secondary Options Markets
 
 Because all contracts get a Key NFT that is freely tradable, it is trivial for secondary markets to
-form around Cardano-Options. These secondary markets can be on anything from other DApps to
-centralized exchanges. These secondary markets will help Cardano-Options to reach its full potential
-as a primary market for decentralized options trading.
+form around Cardano-Options. These secondary markets can be anything from other DApps to centralized
+exchanges. These secondary markets will help Cardano-Options reach its full potential as a primary
+market for decentralized options trading.
 
 ## Conclusion
 

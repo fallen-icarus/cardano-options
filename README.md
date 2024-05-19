@@ -62,7 +62,7 @@ Proof-of-Stake blockchains such as Cardano, and decentralized governance.
 across core DeFi protocols can create systemic risks to the DeFi economy. At best, these risks
 create an unhealthy economy while at worst, they can easily cascade into economic recessions. (For
 an elaboration of this argument, see the [Cardano-Loans
-README](https://github.com/fallen-icarus/cardano-loans/blob/v1.0.0.0rc/README.md#no-trustless-composability-with-other-dapps).)
+README](https://github.com/fallen-icarus/cardano-loans/tree/fb6b7b37ba777fd3aa4aec8a6c3dd2623978dd24#no-trustless-composability-with-other-dapps).)
 - Restrictions on the feature set supported by the options trading market. For an economy to reach
 its full potential, users must be able to express *all* possible preferences exactly. Any deviation
 from their true preferences will create economic distortions. For example, would Alice rather have

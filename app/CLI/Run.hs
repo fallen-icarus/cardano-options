@@ -1,132 +1,211 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module CLI.Run
-(
-  runCommand
-) where
+  (
+    runCommand
+  ) where
 
+import Relude
 import Data.Aeson
-import Data.Aeson.Encode.Pretty
-import qualified Data.ByteString.Lazy as BL
-import Data.Text (Text)
+import qualified Data.ByteString.Lazy as LBS
+import Prettyprinter
+import Prettyprinter.Render.Terminal
 import qualified Data.Text.IO as TIO
-import Data.Text.Encoding as TE
-import qualified Codec.Binary.Encoding as E
+import qualified Data.Text as T
+import qualified Data.ByteString as SBS
+import Data.FileEmbed
+import Optics.Operators
 
-import CLI.Types
-import CLI.Query
 import CardanoOptions
-import Cardano.Address.Style.Shelley hiding (unsafeFromRight)
-import Cardano.Address (fromBech32,unNetworkTag,bech32)
-import Cardano.Address.Script hiding (Script)
+
+import CLI.Data.Bech32Address
+import CLI.Data.Commands
+import CLI.Data.Network
+import CLI.Data.OptionsUTxO
+import CLI.Data.Output
+import CLI.Data.PersonalUTxO
+import CLI.Query
+
+preprodParams :: SBS.ByteString
+preprodParams = $(embedFile "preprod-params.json")
+
+mainnetParams :: SBS.ByteString
+mainnetParams = $(embedFile "mainnet-params.json")
 
 runCommand :: Command -> IO ()
 runCommand cmd = case cmd of
-  ExportScript script file -> runExportScriptCmd script file
-  CreateOptionsDatum d file -> writeData file d
-  CreateOptionsRedeemer r file -> writeData file r
-  CreateBeaconRedeemer r file -> writeData file r
-  ConvertAddress convert output -> runAddressConversion convert output
-  ConvertTime convert -> runTimeConversion convert
-  QueryBeacons query -> runQuery query
+  ExportScript script file -> runExportScript script file
+  CreateDatum protocolDatum file -> runCreateDatum protocolDatum file
+  CreateRedeemer newRedeemer file -> runCreateRedeemer newRedeemer file
+  BeaconName info output -> runBeaconName info output
+  Query query -> runQuery query
+  ConvertTime convert network -> runTimeConversion convert network
+  SubmitTx network api txFile ->
+    runSubmitTx network api txFile >>= LBS.putStr . encode
+  EvaluateTx network api txFile ->
+    runEvaluateTx network api txFile >>= LBS.putStr . encode
+  ExportParams network output -> runExportParams network output
 
-runExportScriptCmd :: Script -> FilePath -> IO ()
-runExportScriptCmd script file = do
-  let script' = case script of
-        OptionsScript -> optionsValidatorScript
-        BeaconPolicy config -> optionsBeaconPolicyScript config
-  res <- writeScript file script'
-  case res of
-    Right _ -> return ()
-    Left err -> putStrLn $ "There was an error: " <> show err
+runExportParams :: Network -> Output -> IO ()
+runExportParams network output = case (network,output) of
+  (PreProdTestnet,Stdout) -> SBS.putStr preprodParams
+  (PreProdTestnet,File file) -> SBS.writeFile file preprodParams
+  (Mainnet,Stdout) -> SBS.putStr mainnetParams
+  (Mainnet,File file) -> SBS.writeFile file mainnetParams
 
-runAddressConversion :: ConvertAddress -> Output -> IO ()
-runAddressConversion (Plutus addr) output = generateBech32Address addr output
-runAddressConversion (Bech32 addr) output = extractAddressInfo addr output
+runExportScript :: Script -> FilePath -> IO ()
+runExportScript script file = do
+  flip whenLeftM_ (\e -> putStrLn $ "There was an error: " <> show e) $
+    writeScript file $ case script of
+      ProposalBeaconScript -> proposalBeaconScript
+      ActiveBeaconScript -> activeBeaconScript
+      AddressUpdateObserverScript -> addressObserverScript
+      OptionsScript -> optionsScript
+      ProxyScript -> proxyScript
 
-runTimeConversion :: ConvertTime -> IO ()
-runTimeConversion (POSIXTimeToSlot p) = print $ getSlot $ posixTimeToSlot p
-runTimeConversion (SlotToPOSIXTime s) = print $ getPOSIXTime $ slotToPOSIXTime s
+runTimeConversion :: ConvertTime -> Network -> IO ()
+runTimeConversion time network = case time of
+    POSIXTimeToSlot p -> print $ getSlot $ posixTimeToSlot config p
+    SlotToPOSIXTime s -> print $ getPOSIXTime $ slotToPOSIXTime config s
+  where
+    config = case network of
+      Mainnet -> mainnetConfig
+      PreProdTestnet -> preprodConfig
+
+runCreateDatum :: NewDatum -> FilePath -> IO ()
+runCreateDatum (NewProposalDatum newProposalInfo) file = 
+  writeData file $ unsafeCreateProposalDatum newProposalInfo
+runCreateDatum (NewPaymentDatum contractId) file = 
+  writeData file $ PaymentDatum (ActiveBeaconId activeBeaconCurrencySymbol,contractId)
+runCreateDatum (NewActiveDatumManual newActive) file = 
+  writeData file $ unsafeCreateActiveDatum newActive
+runCreateDatum (NewActiveDatumAuto network endpoint desiredTermsIndex proposalRef) file = do
+  utxo <- runQuerySpecificOptionsUTxO network endpoint proposalRef
+  case utxo of
+    [OptionsUTxO{optionsDatum=Just (Proposal datum)}] -> 
+      writeData file $ createActiveDatumFromProposal desiredTermsIndex proposalRef datum
+    _ -> error "Not a Proposal UTxO."
+runCreateDatum (NewPostAddressUpdateActiveDatumManual datum) file = 
+  writeData file $ unsafeCreatePostAddressUpdateActiveDatum datum
+runCreateDatum (NewPostAddressUpdateActiveDatumAuto network endpoint contractRef newAddr incr) file = do
+  utxo <- runQuerySpecificOptionsUTxO network endpoint contractRef
+  case utxo of
+    [OptionsUTxO{optionsDatum=Just (Active datum)}] -> 
+      writeData file $ datum & #paymentAddress .~ newAddr
+                             & #contractDeposit .~ (datum ^. #contractDeposit) + incr
+    _ -> error "Not an Active UTxO."
+
+runCreateRedeemer :: NewRedeemer -> FilePath -> IO ()
+runCreateRedeemer (NewProposalRedeemer redeemer) file = writeData file redeemer
+runCreateRedeemer (NewOptionsRedeemer redeemer) file = writeData file redeemer
+runCreateRedeemer (NewActiveRedeemer redeemer) file = writeData file redeemer
+runCreateRedeemer (NewAddressObserverRedeemer redeemer) file = writeData file redeemer
+
+runBeaconName :: BeaconName -> Output -> IO ()
+runBeaconName name output = 
+    displayName $ case name of
+      ProposalPolicyId -> show proposalBeaconCurrencySymbol
+      ActivePolicyId -> show activeBeaconCurrencySymbol
+      OfferBeaconName asset -> 
+        showTokenName $ unOfferBeacon $ genOfferBeaconName asset
+      AskBeaconName asset -> 
+        showTokenName $ unAskBeacon $ genAskBeaconName asset
+      PremiumBeaconName asset -> 
+        showTokenName $ unPremiumBeacon $ genPremiumBeaconName asset
+      TradingPairBeaconName offerAsset askAsset -> 
+        showTokenName $ unTradingPairBeacon $ genTradingPairBeaconName offerAsset askAsset
+      ContractIdName proposalRef -> 
+        showTokenName $ unContractId $ genContractId proposalRef
+  where
+    displayName :: String -> IO ()
+    displayName = case output of
+      Stdout -> putStr
+      File file -> writeFile file
 
 runQuery :: Query -> IO ()
 runQuery query = case query of
-  QueryAvailableContracts network policyId output -> 
-    runQueryAvailableContracts network policyId >>= toOutput output
-  QueryOwnAssetsUTxOs network policyId addr output ->
-    runQueryOwnAssets network policyId addr >>= toOutput output
-  QueryOwnProposedUTxOs network policyId addr output ->
-    runQueryOwnProposals network policyId addr >>= toOutput output
-  QueryOwnActiveUTxOs network policyId addr output ->
-    runQueryOwnActive network policyId addr >>= toOutput output
-  QuerySpecificContract network policyId contractID output ->
-    runQuerySpecificContract network policyId contractID >>= toOutput output
-  QueryOwnContracts network policyId addr output ->
-    runQueryOwnContracts network policyId addr >>= toOutput output
+  QueryCurrentSlot network api -> runQuerySlotTip network api >>= print
+  QueryPersonal network api addr keysOnly format output ->
+    runQueryPersonalAddress network api addr keysOnly >>= 
+      case format of
+        JSON -> toJSONOutput output
+        Pretty -> toPrettyOutput output 
+                . (<> hardline) 
+                . (personalHeader <>) 
+                . vsep 
+                . map prettyPersonalUTxO 
+        Plain -> toPlainOutput output 
+                . (<> hardline) 
+                . (personalHeader <>) 
+                . vsep 
+                . map prettyPersonalUTxO
+  QueryProposals network api mOfferAsset mAskAsset mPremiumAsset mWriterAddr format output -> do
+    let askBeacon = 
+          ((proposalBeaconCurrencySymbol,) . unAskBeacon . genAskBeaconName)
+            <$> mAskAsset
+        offerBeacon = 
+          ((proposalBeaconCurrencySymbol,) . unOfferBeacon . genOfferBeaconName)
+            <$> mOfferAsset
+        premiumBeacon = 
+          ((proposalBeaconCurrencySymbol,) . unPremiumBeacon . genPremiumBeaconName)
+            <$> mPremiumAsset
+        pairBeacon = fmap ((proposalBeaconCurrencySymbol,) . unTradingPairBeacon) 
+                   . genTradingPairBeaconName <$> mOfferAsset <*> mAskAsset
+        assets
+          | isJust pairBeacon = catMaybes [pairBeacon,premiumBeacon]
+          | otherwise = catMaybes [askBeacon,offerBeacon,premiumBeacon]
+    case (mWriterAddr,assets) of
+      (Nothing,[]) -> 
+        print @Text "At least one beacon filter must be specified or a writer address must be specified."
+      _ -> runQueryOptionsUTxOs network api assets mWriterAddr >>= case format of
+        JSON -> toJSONOutput output
+        Pretty -> toPrettyOutput output . (<> hardline) . vsep . map (prettyOptionsUTxO network)
+        Plain -> toPlainOutput output . (<> hardline) . vsep . map (prettyOptionsUTxO network)
+  QueryActives network api mOfferAsset mAskAsset mContractId mWriterAddr format output -> do
+    let askBeacon = 
+          ((activeBeaconCurrencySymbol,) . unAskBeacon . genAskBeaconName)
+            <$> mAskAsset
+        offerBeacon = 
+          ((activeBeaconCurrencySymbol,) . unOfferBeacon . genOfferBeaconName)
+            <$> mOfferAsset
+        contractIdBeacon = 
+          ((activeBeaconCurrencySymbol,) . unContractId)
+            <$> mContractId
+        pairBeacon = fmap ((activeBeaconCurrencySymbol,) . unTradingPairBeacon) 
+                   . genTradingPairBeaconName <$> mOfferAsset <*> mAskAsset
+        assets
+          | isJust pairBeacon = catMaybes [pairBeacon,contractIdBeacon]
+          | otherwise = catMaybes [askBeacon,offerBeacon,contractIdBeacon]
+    case (mWriterAddr,assets) of
+      (Nothing,[]) -> 
+        print @Text "At least one beacon filter must be specified or a writer address must be specified."
+      (Nothing,_) -> do
+        rawResult <- runQueryOptionsUTxOs network api assets mWriterAddr
+        let result
+              | catMaybes [offerBeacon,askBeacon] == [] = flip filter rawResult $
+                  \OptionsUTxO{optionsAddress} -> fromRight False $ isOptionsAddress optionsAddress
+              | otherwise = rawResult
+        case format of
+          JSON -> toJSONOutput output result
+          Pretty -> toPrettyOutput output $ (<> hardline) $ vsep $ map (prettyOptionsUTxO network) result
+          Plain -> toPlainOutput output $ (<> hardline) $ vsep $ map (prettyOptionsUTxO network) result
+      _ -> runQueryOptionsUTxOs network api assets mWriterAddr >>= case format of
+        JSON -> toJSONOutput output
+        Pretty -> toPrettyOutput output . (<> hardline) . vsep . map (prettyOptionsUTxO network)
+        Plain -> toPlainOutput output . (<> hardline) . vsep . map (prettyOptionsUTxO network)
 
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
-convertToAddressInfo :: InspectAddress -> AddressInfo'
-convertToAddressInfo (InspectAddressShelley AddressInfo{..}) = AddressInfo'
-    { addressSpendingKeyHash = convertByteString <$> infoSpendingKeyHash
-    , addressSpendingScriptHash = convertByteString <$> infoScriptHash
-    , addressStakeKeyHash = convertByteString <$> infoStakeKeyHash
-    , addressStakeScriptHash = convertByteString <$> infoStakeScriptHash
-    , addressNetworkTag = unNetworkTag infoNetworkTag
-    }
-  where convertByteString = decodeUtf8 . E.encode E.EBase16
-convertToAddressInfo _ = error "This is not a shelley address."
+toPlainOutput :: Output -> Doc AnsiStyle -> IO ()
+toPlainOutput Stdout xs = TIO.putStr $ T.pack $ show $ unAnnotate xs
+toPlainOutput (File file) xs = TIO.writeFile file $ T.pack $ show xs
 
-toOutput :: (ToJSON a) => Output -> a -> IO ()
-toOutput output xs = case output of
-  Stdout -> BL.putStr $ encode xs
-  File file -> BL.writeFile file $ encodePretty xs
+toPrettyOutput :: Output -> Doc AnsiStyle -> IO ()
+toPrettyOutput Stdout xs = putDoc xs
+toPrettyOutput (File file) xs = 
+  TIO.writeFile file $ renderStrict $ layoutPretty defaultLayoutOptions xs
 
-extractAddressInfo :: Text -> Output -> IO ()
-extractAddressInfo addr output = do
-  let mAddr = fromBech32 addr
-      inspect addr' = convertToAddressInfo <$> eitherInspectAddress Nothing addr'
-  case (mAddr,output) of
-    (Nothing,_) -> 
-      putStrLn "Not a valid bech32 address."
-    (Just x, File file) -> 
-      BL.writeFile file $ encodePretty $ unsafeFromRight $ inspect x
-    (Just x, Stdout) -> 
-      BL.putStr $ encode $ unsafeFromRight $ inspect x
-
--- | This is hardcoded to only generate addresses for the Preprod testnet.
-generateBech32Address :: Address -> Output -> IO ()
-generateBech32Address (Address paymentCred mStakeCred) output = do
-  let Right tag = mkNetworkDiscriminant 0 -- ^ Preproduction Testnet
-      bechAddr = case (paymentCred,mStakeCred) of
-        (PubKeyCredential pkh, Nothing) ->
-          let Just hash = keyHashFromBytes (Payment, getPubKeyHash pkh)
-          in bech32 $ paymentAddress tag (PaymentFromKeyHash hash)
-        (ScriptCredential vh, Nothing) ->
-          let Just scriptHash = scriptHashFromBytes $ getValidatorHash vh
-          in bech32 $ paymentAddress tag (PaymentFromScript scriptHash)
-        (PubKeyCredential pkh, Just (StakingHash (PubKeyCredential spkh))) ->
-          let Just pHash = keyHashFromBytes (Payment, getPubKeyHash pkh)
-              Just sHash = keyHashFromBytes (Delegation, getPubKeyHash spkh)
-          in bech32 $ 
-              delegationAddress tag (PaymentFromKeyHash pHash) (DelegationFromKeyHash sHash)
-        (PubKeyCredential pkh, Just (StakingHash (ScriptCredential vh))) ->
-          let Just pHash = keyHashFromBytes (Payment, getPubKeyHash pkh)
-              Just scriptHash = scriptHashFromBytes $ getValidatorHash vh
-          in bech32 $ 
-              delegationAddress tag (PaymentFromKeyHash pHash) (DelegationFromScript scriptHash)
-        (ScriptCredential vh, Just (StakingHash (PubKeyCredential pkh))) ->
-          let Just scriptHash = scriptHashFromBytes $ getValidatorHash vh
-              Just sHash = keyHashFromBytes (Delegation, getPubKeyHash pkh)
-          in bech32 $ 
-              delegationAddress tag (PaymentFromScript scriptHash) (DelegationFromKeyHash sHash)
-        (ScriptCredential pvh, Just (StakingHash (ScriptCredential svh))) -> 
-          let Just pScriptHash = scriptHashFromBytes $ getValidatorHash pvh
-              Just sScriptHash = scriptHashFromBytes $ getValidatorHash svh
-          in bech32 $ 
-              delegationAddress tag (PaymentFromScript pScriptHash) (DelegationFromScript sScriptHash)
-        _ -> error "Not a valid address."
-  case output of
-    Stdout -> TIO.putStrLn bechAddr
-    File file -> TIO.writeFile file bechAddr
+toJSONOutput :: (ToJSON a) => Output -> [a] -> IO ()
+toJSONOutput Stdout xs = LBS.putStr $ encode xs
+toJSONOutput (File file) xs = LBS.writeFile file $ encode xs

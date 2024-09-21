@@ -1,178 +1,439 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module CLI.Parsers
 (
   parseCommand
 ) where
 
 import Options.Applicative
-import Data.Text (pack)
+import Relude
 
 import CardanoOptions
-import CLI.Types
+
+import CLI.Data.ApiService
+import CLI.Data.Bech32Address
+import CLI.Data.Commands
+import CLI.Data.Network
+import CLI.Data.Output
 
 -------------------------------------------------
 -- Main Parsers
 -------------------------------------------------
 parseCommand :: Parser Command
 parseCommand = hsubparser $ mconcat
-  [ command "export-script"
-      (info parseExportScript $ progDesc "Export a dApp plutus script.")
-  , command "options-datum"
-      (info parseCreateOptionsDatum $ progDesc "Create a datum for the options validator.")
-  , command "options-redeemer"
-      (info pCreateOptionsRedeemer $ progDesc "Create a redeemer for the options validator.")
-  , command "beacon-redeemer"
-      (info parseCreateBeaconRedeemer $ progDesc "Create a redeemer for the beacon policy.")
-  , command "convert-address"
-      (info pConvertAddress $ progDesc "Convert plutus address <--> Bech32 address.")
-  , command "convert-time"
-      (info pConvertTime $ progDesc "Convert POSIXTime <--> Slot.")
-  , command "query"
-      (info parseQueryBeacons $ progDesc "Query the dApp's beacons.")
+  [ command "scripts" $
+      info parseExportScript $ progDesc "Export a protocol plutus script."
+  , command "datums" $
+      info parseCreateDatum $ progDesc "Create a datum for the protocol."
+  , command "redeemers" $
+      info parseCreateRedeemer $ progDesc "Create a redeemer for the protocol."
+  , command "beacon-name" $
+      info parseBeaconName $ progDesc "Calculate a beacon policy id or asset name."
+  , command "convert-time" $
+      info pConvertTime $ progDesc "Convert POSIXTime <--> Slot."
+  , command "query" $
+      info parseQuery $ progDesc "Query the blockchain."
+  , command "submit" $
+      info pSubmitTx $ progDesc "Submit a transaction to the blockchain."
+  , command "protocol-params" $
+      info pExportParams $ progDesc "Export the current protocol parameters."
+  , command "evaluate-tx" $
+      info pEvaluateTx $ progDesc "Estimate script execution units for a transaction."
   ]
 
 -------------------------------------------------
 -- Scripts Parser
 -------------------------------------------------
 parseExportScript :: Parser Command
-parseExportScript = hsubparser $ mconcat
-    [ command "beacon-policy"
-        (info pExportPolicy $ progDesc "Export the beacon policy for a specific trading pair.")
-    , command "options-script"
-        (info pExportOptions $ progDesc "Export the options validator script.")
+parseExportScript = 
+    ExportScript
+      <$> pScript
+      <*> pOutputFile
+  where
+    pScript :: Parser Script
+    pScript = pProposalScript
+          <|> pActiveScript
+          <|> pAddressUpdateScript
+          <|> pOptionsScript
+          <|> pProxyScript
+
+    pProposalScript :: Parser Script
+    pProposalScript = flag' ProposalBeaconScript
+      (  long "proposal-script"
+      <> help "Export the proposal beacon script."
+      )
+
+    pActiveScript :: Parser Script
+    pActiveScript = flag' ActiveBeaconScript
+      (  long "active-script"
+      <> help "Export the active beacon script."
+      )
+
+    pAddressUpdateScript :: Parser Script
+    pAddressUpdateScript = flag' AddressUpdateObserverScript
+      (  long "address-update-script"
+      <> help "Export the address update observer script."
+      )
+
+    pOptionsScript :: Parser Script
+    pOptionsScript = flag' OptionsScript
+      (  long "options-script"
+      <> help "Export the options spending script."
+      )
+
+    pProxyScript :: Parser Script
+    pProxyScript = flag' ProxyScript
+      (  long "proxy-script"
+      <> help "Export the proxy script."
+      )
+
+-------------------------------------------------
+-- CreateDatum Parser
+-------------------------------------------------
+parseCreateDatum :: Parser Command
+parseCreateDatum = hsubparser $ mconcat
+  [ command "proposal" $
+      info pCreateNewProposalInfo $ progDesc "Create a ProposalDatum."
+  , command "active" $
+      info pCreateActiveDatum $ progDesc "Create an ActiveDatum."
+  , command "payment" $
+      info pCreatePaymentDatum $ progDesc "Create a PaymentDatum."
+  ]
+
+pCreatePaymentDatum :: Parser Command
+pCreatePaymentDatum = 
+  CreateDatum 
+    <$> (NewPaymentDatum <$> pContractId)
+    <*> pOutputFile
+
+pCreateNewProposalInfo :: Parser Command
+pCreateNewProposalInfo =
+    CreateDatum
+      <$> pNewProposalInfo
+      <*> pOutputFile
+  where
+    pNewProposalInfo :: Parser NewDatum
+    pNewProposalInfo =
+      fmap NewProposalDatum $ NewProposalInfo
+        <$> pOfferAsset
+        <*> pOfferQuantity
+        <*> pAskAsset
+        <*> pPremiumAsset
+        <*> pContractDeposit
+        <*> pPaymentAddress
+        <*> some pPossibleTerm
+
+pCreateActiveDatum :: Parser Command
+pCreateActiveDatum = hsubparser $ mconcat
+  [ command "new" $
+      info pCreateNewActiveInfo $ progDesc "Create a new ActiveDatum."
+  , command "post-address-update" $
+      info pCreatePostAddressUpdateActive $ progDesc "Create a post-address-update ActiveDatum."
+  ]
+
+pCreateNewActiveInfo :: Parser Command
+pCreateNewActiveInfo = hsubparser $ mconcat
+  [ command "manual" $
+      info pCreateNewActiveInfoManual $ progDesc "Create a new ActiveDatum manually."
+  , command "auto" $
+      info pCreateNewActiveInfoAuto $ progDesc "Create a new ActiveDatum by looking up the proposal UTxO."
+  ]
+
+pCreateNewActiveInfoManual :: Parser Command
+pCreateNewActiveInfoManual =
+    CreateDatum
+      <$> pNewActiveInfo
+      <*> pOutputFile
+  where
+    pNewActiveInfo :: Parser NewDatum
+    pNewActiveInfo =
+      fmap NewActiveDatumManual $ NewActiveInfo
+        <$> pOfferAsset
+        <*> pOfferQuantity
+        <*> pAskAsset
+        <*> pStrikePrice
+        <*> pExpiration
+        <*> pContractDeposit
+        <*> pPaymentAddress
+        <*> pProposalTxOutRef
+
+pCreateNewActiveInfoAuto :: Parser Command
+pCreateNewActiveInfoAuto =
+    CreateDatum
+      <$> pNewActive
+      <*> pOutputFile
+  where
+    pNewActive :: Parser NewDatum
+    pNewActive =
+      NewActiveDatumAuto
+        <$> pNetwork
+        <*> pApiService
+        <*> (fromIntegral <$> pDesiredTermsIndex)
+        <*> pProposalTxOutRef
+
+pCreatePostAddressUpdateActive :: Parser Command
+pCreatePostAddressUpdateActive = hsubparser $ mconcat
+  [ command "manual" $
+      info pCreatePostAddressUpdateActiveManual $ 
+        progDesc "Create a post-address-update ActiveDatum manually."
+  , command "auto" $
+      info pCreatePostAddressUpdateActiveAuto $ 
+        progDesc "Create a post-address-update ActiveDatum by looking up the contract UTxO."
+  ]
+
+pCreatePostAddressUpdateActiveManual :: Parser Command
+pCreatePostAddressUpdateActiveManual =
+    CreateDatum
+      <$> pNewAddressUpdateInfo
+      <*> pOutputFile
+  where
+    pNewAddressUpdateInfo :: Parser NewDatum
+    pNewAddressUpdateInfo =
+      fmap NewPostAddressUpdateActiveDatumManual $ NewAddressInfo
+        <$> pOfferAsset
+        <*> pOfferQuantity
+        <*> pAskAsset
+        <*> pStrikePrice
+        <*> pExpiration
+        <*> pContractDeposit
+        <*> pPaymentAddress
+        <*> pContractId
+
+pCreatePostAddressUpdateActiveAuto :: Parser Command
+pCreatePostAddressUpdateActiveAuto =
+    CreateDatum
+      <$> pNewAddressUpdate
+      <*> pOutputFile
+  where
+    pNewAddressUpdate :: Parser NewDatum
+    pNewAddressUpdate =
+      NewPostAddressUpdateActiveDatumAuto
+        <$> pNetwork
+        <*> pApiService
+        <*> pContractTxOutRef
+        <*> pPaymentAddress
+        <*> pDepositIncrease
+
+-------------------------------------------------
+-- CreateRedeemer Parser
+-------------------------------------------------
+parseCreateRedeemer :: Parser Command
+parseCreateRedeemer = hsubparser $ mconcat
+    [ command "proposal-script" $
+        info pProposalRedeemer $ progDesc "Create a redeemer for the proposal script."
+    , command "options-script" $
+        info pOptionsRedeemer $ progDesc "Create a redeemer for the options script."
+    , command "active-script" $
+        info pActiveRedeemer $ progDesc "Create a redeemer for the active script."
+    , command "address-update-script" $
+        info pAddressObserverRedeemer $ 
+          progDesc "Create a redeemer for the address update observer script."
+    ]
+
+pProposalRedeemer :: Parser Command
+pProposalRedeemer = hsubparser $ mconcat
+    [ command "manage-proposals" $
+        info pCreateCloseOrUpdateProposals $ 
+          progDesc "Create the redeemer for creating/updating/closing Proposal UTxOs."
+    , command "burn-all" $
+        info pBurnProposalBeacons $ progDesc "Create the redeemer for burning all beacons."
+    , command "register" $
+        info pRegisterProposalScript $ progDesc "Create the redeemer for registering the script."
     ]
   where
-    pExportPolicy :: Parser Command
-    pExportPolicy = ExportScript <$> pPolicy <*> pOutputFile
+    pCreateCloseOrUpdateProposals :: Parser Command
+    pCreateCloseOrUpdateProposals = 
+      CreateRedeemer
+        <$> pure (NewProposalRedeemer CreateCloseOrUpdateProposals)
+        <*> pOutputFile
 
-    pExportOptions :: Parser Command
-    pExportOptions = ExportScript <$> pure OptionsScript <*> pOutputFile
+    pBurnProposalBeacons :: Parser Command
+    pBurnProposalBeacons = 
+      CreateRedeemer 
+        <$> pure (NewProposalRedeemer BurnProposalBeacons)
+        <*> pOutputFile
 
-    pPolicy :: Parser Script
-    pPolicy = BeaconPolicy <$> pOptionsConfig
+    pRegisterProposalScript :: Parser Command
+    pRegisterProposalScript =
+      CreateRedeemer 
+        <$> pure (NewProposalRedeemer RegisterProposalScript)
+        <*> pOutputFile
 
--------------------------------------------------
--- CreateOptionsDatum Parser
--------------------------------------------------
-parseCreateOptionsDatum :: Parser Command
-parseCreateOptionsDatum = hsubparser $ mconcat
-    [ command "assets-datum"
-        (info pAssets $ progDesc "Create the datum for creating an Assets UTxO to back a contract.")
-    , command "proposal-datum"
-        (info pProposal $ progDesc "Create the datum for proposing a contract.")
-    , command "active-datum"
-        (info pAccept $ progDesc "Create the datum for accepting/updating a contract.")
+pOptionsRedeemer :: Parser Command
+pOptionsRedeemer = hsubparser $ mconcat
+    [ command "manage-proposal" $
+        info pCloseOrUpdateProposal $ 
+          progDesc "Create the redeemer for updating/closing Proposal UTxOs."
+    , command "purchase" $
+        info pPurchaseContract $ 
+          progDesc "Create the redeemer for purchasing a Proposal UTxO."
+    , command "execute" $
+        info pExecute $ 
+          progDesc "Create the redeemer for executing an Active UTxO."
+    , command "close-expired" $
+        info pCloseExpired $ 
+          progDesc "Create the redeemer for closing an expired Active UTxO."
+    , command "update-payment-address" $
+        info pUpdatePaymentAddress $ 
+          progDesc "Create the redeemer for changing the payment address."
     ]
   where
-    pAssets :: Parser Command
-    pAssets = CreateOptionsDatum <$> pAssetsForContract <*> pOutputFile
+    pCloseOrUpdateProposal :: Parser Command
+    pCloseOrUpdateProposal = 
+      CreateRedeemer
+        <$> pure (NewOptionsRedeemer CloseOrUpdateProposal)
+        <*> pOutputFile
 
-    pProposal :: Parser Command
-    pProposal = CreateOptionsDatum <$> pProposedContract <*> pOutputFile
+    pPurchaseContract :: Parser Command
+    pPurchaseContract = 
+      CreateRedeemer 
+        <$> (NewOptionsRedeemer . PurchaseContract <$> pDesiredTermsIndex) 
+        <*> pOutputFile
 
-    pAccept :: Parser Command
-    pAccept = CreateOptionsDatum <$> pActiveContract <*> pOutputFile
-
--------------------------------------------------
--- CreateOptionsRedeemer Parsers
--------------------------------------------------
-pCreateOptionsRedeemer :: Parser Command
-pCreateOptionsRedeemer = hsubparser $ mconcat
-    [ command "close-assets"
-        (info pCloseAssets $ progDesc "Close an Assets UTxO.")
-    , command "close-proposal"
-        (info pCloseProposed $ progDesc "Close Proposal UTxO(s).")
-    , command "purchase-contract"
-        (info pAcceptContract $ progDesc "Purchase an options contract.")
-    , command "execute-contract"
-        (info pExecuteContract $ progDesc "Execute an options contract.")
-    , command "close-expired-contract"
-        (info pCloseExpired $ progDesc "Close and expired contract UTxO.")
-    , command "update-address"
-        (info pUpdateAddress $ progDesc "Update an ActiveDatum's address")
-    ]
-  where
-    pCloseAssets :: Parser Command
-    pCloseAssets = CreateOptionsRedeemer CloseAssets <$> pOutputFile
-
-    pCloseProposed :: Parser Command
-    pCloseProposed = CreateOptionsRedeemer CloseProposedContracts <$> pOutputFile
-
-    pAcceptContract :: Parser Command
-    pAcceptContract = CreateOptionsRedeemer AcceptContract <$> pOutputFile
-
-    pExecuteContract :: Parser Command
-    pExecuteContract = CreateOptionsRedeemer ExecuteContract <$> pOutputFile
+    pExecute :: Parser Command
+    pExecute = 
+      CreateRedeemer
+        <$> pure (NewOptionsRedeemer ExecuteContract)
+        <*> pOutputFile
 
     pCloseExpired :: Parser Command
-    pCloseExpired = CreateOptionsRedeemer CloseExpiredContract <$> pOutputFile
-
-    pUpdateAddress :: Parser Command
-    pUpdateAddress = 
-      CreateOptionsRedeemer 
-        <$> (UpdateAddress <$> pAddress)
+    pCloseExpired = 
+      CreateRedeemer 
+        <$> pure (NewOptionsRedeemer CloseExpiredContract) 
         <*> pOutputFile
 
--------------------------------------------------
--- CreateBeaconRedeemer Parser
--------------------------------------------------
-parseCreateBeaconRedeemer :: Parser Command
-parseCreateBeaconRedeemer = hsubparser $ mconcat
-    [ command "mint-assets"
-        (info pMintAssets $ progDesc "Create the redeemer for minting an Assets beacon.")
-    , command "mint-proposal"
-        (info pMintProposed $ progDesc "Create the redeemer for minting Proposed beacons.")
-    , command "mint-active"
-        (info pMintActive $ progDesc "Create the redeemer for minting an Active beacon and ContractID.")
-    , command "burn-beacons"
-        (info pBurnBeacons $ progDesc "Create the redeemer for burning beacons.")
+    pUpdatePaymentAddress :: Parser Command
+    pUpdatePaymentAddress = 
+      CreateRedeemer
+        <$> (fmap NewOptionsRedeemer . UpdatePaymentAddress <$> pPaymentAddress <*> pDepositIncrease)
+        <*> pOutputFile
+
+pActiveRedeemer :: Parser Command
+pActiveRedeemer = hsubparser $ mconcat
+    [ command "main" $
+        info pMain $ 
+          progDesc "Create the redeemer for purchasing, executing, or closing contracts"
+    , command "burn-all" $
+        info pBurnActiveBeacons $ 
+          progDesc "Create the redeemer for burning active beacons."
     ]
   where
-    pMintAssets :: Parser Command
-    pMintAssets = CreateBeaconRedeemer MintAssetsBeacon <$> pOutputFile
-
-    pMintProposed :: Parser Command
-    pMintProposed = 
-      CreateBeaconRedeemer MintProposedBeacons <$> pOutputFile
-
-    pMintActive :: Parser Command
-    pMintActive = 
-      CreateBeaconRedeemer 
-        <$> (MintActiveBeacon <$> pContractId <*> pCredential)
+    pMain :: Parser Command
+    pMain = 
+      CreateRedeemer
+        <$> pure (NewActiveRedeemer $ PurchaseExecuteOrCloseExpiredContracts proposalBeaconCurrencySymbol)
         <*> pOutputFile
-    
-    pBurnBeacons :: Parser Command
-    pBurnBeacons = CreateBeaconRedeemer BurnBeacons <$> pOutputFile
 
-    pScriptCredential :: Parser Credential
-    pScriptCredential = ScriptCredential <$> option (eitherReader readValidatorHash)
-      (  long "staking-script-hash"
-      <> metavar "STRING"
-      <> help "The hash of the staking script used in the options' address."
+    pBurnActiveBeacons :: Parser Command
+    pBurnActiveBeacons = 
+      CreateRedeemer
+        <$> pure (NewActiveRedeemer BurnActiveBeacons)
+        <*> pOutputFile
+
+pAddressObserverRedeemer :: Parser Command
+pAddressObserverRedeemer = hsubparser $ mconcat
+    [ command "observe-address-update" $
+        info pObserveAddressUpdate $ 
+          progDesc "Create the redeemer for observing a payment address update."
+    , command "register" $
+        info pRegisterAddressObserverScript $ 
+          progDesc "Create the redeemer for registering the script."
+    ]
+  where
+    pObserveAddressUpdate :: Parser Command
+    pObserveAddressUpdate = 
+      CreateRedeemer 
+        <$> pure (NewAddressObserverRedeemer ObserveAddressUpdate)
+        <*> pOutputFile
+
+    pRegisterAddressObserverScript :: Parser Command
+    pRegisterAddressObserverScript =
+      CreateRedeemer 
+        <$> pure (NewAddressObserverRedeemer RegisterAddressObserverScript)
+        <*> pOutputFile
+
+-------------------------------------------------
+-- Beacon Name Parsers
+-------------------------------------------------
+parseBeaconName :: Parser Command
+parseBeaconName = hsubparser $ mconcat
+    [ command "policy-id" $
+        info pPolicyId $ progDesc "Calculate a beacon policy id."
+    , command "asset-name" $
+        info pAssetName $ progDesc "Calculate a beacon asset name."
+    ]
+  where
+    pProposalPolicyId :: Parser BeaconName
+    pProposalPolicyId = flag' ProposalPolicyId
+      (  long "proposal-beacons"
+      <> help "Calculate the policy id for the proposal beacons."
       )
 
-    pPubKeyCredential :: Parser Credential
-    pPubKeyCredential = PubKeyCredential <$> option (eitherReader readPubKeyHash)
-      ( long "staking-pubkey-hash"
-      <> metavar "STRING"
-      <> help "The hash of the staking pubkey used in the options' address."
+    pActiveId :: Parser BeaconName
+    pActiveId = flag' ActivePolicyId
+      (  long "active-beacons"
+      <> help "Calculate the policy id for the active beacons."
       )
 
-    pCredential :: Parser Credential
-    pCredential = pPubKeyCredential <|> pScriptCredential
+    pOfferBeaconName :: Parser Command
+    pOfferBeaconName = 
+      BeaconName 
+        <$> (OfferBeaconName <$> pOfferAsset)
+        <*> pOutput
+
+    pAskBeaconName :: Parser Command
+    pAskBeaconName = 
+      BeaconName 
+        <$> (AskBeaconName <$> pAskAsset)
+        <*> pOutput
+
+    pPremiumBeaconName :: Parser Command
+    pPremiumBeaconName = 
+      BeaconName
+        <$> (PremiumBeaconName <$> pPremiumAsset)
+        <*> pOutput
+
+    pTradingPairBeaconName :: Parser Command
+    pTradingPairBeaconName = 
+      BeaconName
+        <$> (TradingPairBeaconName <$> pOfferAsset <*> pAskAsset)
+        <*> pOutput
+
+    pContractIdName :: Parser Command
+    pContractIdName = 
+      BeaconName 
+        <$> (ContractIdName <$> pProposalTxOutRef)
+        <*> pOutput
+
+    pAssetName :: Parser Command
+    pAssetName = hsubparser $ mconcat
+      [ command "offer-beacon" $
+          info pOfferBeaconName $ progDesc "Calculate the name for the Offer Beacon."
+      , command "ask-beacon" $
+          info pAskBeaconName $ progDesc "Calculate the name for the Ask Beacon."
+      , command "premium-beacon" $
+          info pPremiumBeaconName $ progDesc "Calculate the name for the Premium Beacon."
+      , command "trading-pair-beacon" $
+          info pTradingPairBeaconName $ progDesc "Calculate the name for the TradingPair Beacon."
+      , command "contract-id" $
+          info pContractIdName $ progDesc "Calculate the name for the Contract ID."
+      ]
+
+    pPolicyId :: Parser Command
+    pPolicyId = 
+      BeaconName
+        <$> (pProposalPolicyId <|> pActiveId)
+        <*> pOutput
 
 -------------------------------------------------
 -- ConvertTime Parser
 -------------------------------------------------
 pConvertTime :: Parser Command
-pConvertTime = ConvertTime <$> (pPOSIXTime <|> pSlot)
+pConvertTime = ConvertTime <$> (pPOSIXTime <|> pSlot) <*> pNetwork
   where
     pPOSIXTime :: Parser ConvertTime
     pPOSIXTime = POSIXTimeToSlot . POSIXTime <$> option auto
       (  long "posix-time"
       <> metavar "INT"
-      <> help "Convert POSIX time to slot number."
+      <> help "Convert POSIX time (in milliseconds) to slot number."
       )
 
     pSlot :: Parser ConvertTime
@@ -183,57 +444,94 @@ pConvertTime = ConvertTime <$> (pPOSIXTime <|> pSlot)
       )
 
 -------------------------------------------------
--- ConvertAddress Parser
+-- Submit Parser
 -------------------------------------------------
-pConvertAddress :: Parser Command
-pConvertAddress = 
-    ConvertAddress <$> (pBech <|> pPlutus) <*> pOutput
+pSubmitTx :: Parser Command
+pSubmitTx = 
+  SubmitTx
+    <$> pNetwork
+    <*> pApiService
+    <*> pTxFile
+
+-------------------------------------------------
+-- EvaluateTx Parser
+-------------------------------------------------
+pEvaluateTx :: Parser Command
+pEvaluateTx = 
+  EvaluateTx 
+    <$> pNetwork
+    <*> pApiService
+    <*> pTxFile
+
+-------------------------------------------------
+-- ExportParams Parser
+-------------------------------------------------
+pExportParams :: Parser Command
+pExportParams =
+  ExportParams
+    <$> pNetwork
+    <*> pOutput
+
+-------------------------------------------------
+-- Query Parser
+-------------------------------------------------
+parseQuery :: Parser Command
+parseQuery = fmap Query . hsubparser $ mconcat
+  [ command "personal-address" $
+      info pQueryPersonal $ progDesc "Query your personal address." 
+  , command "proposals" $
+      info pQueryProposals $ progDesc "Query open proposals for the protocol." 
+  , command "actives" $
+      info pQueryActives $ progDesc "Query active contracts for the protocol." 
+  , command "current-slot" $
+      info pQueryCurrentSlot $ progDesc "Query the current slot number."
+  ]
+
+pQueryPersonal :: Parser Query
+pQueryPersonal =
+  QueryPersonal
+    <$> pNetwork
+    <*> pApiService
+    <*> pBech32Address
+    <*> pKeysOnly
+    <*> pFormat
+    <*> pOutput
   where
-    pBech :: Parser ConvertAddress
-    pBech = Bech32 . pack <$> pBech32Address
+    pKeysOnly :: Parser Bool
+    pKeysOnly = flag False True
+      (  long "keys"
+      <> help "Show only UTxOs with contract key NFTs."
+      )
 
-    pPlutus :: Parser ConvertAddress
-    pPlutus = Plutus <$> pAddress
+pQueryCurrentSlot :: Parser Query
+pQueryCurrentSlot =
+  QueryCurrentSlot
+    <$> pNetwork
+    <*> pApiService
 
--------------------------------------------------
--- QueryBeacons Parser
--------------------------------------------------
-parseQueryBeacons :: Parser Command
-parseQueryBeacons = fmap QueryBeacons . hsubparser $ mconcat
-    [ command "available-contracts"
-        (info pAvailableContracts $ progDesc "Query all available contracts for purchase.")
-    , command "own-assets-utxos"
-        (info pOwnAssets $ progDesc "Query all own assets UTxOs for a given trading pair.")
-    , command "own-proposal-utxos"
-        (info pOwnProposals $ progDesc "Query all own proposal UTxOs for a given trading pair.")
-    , command "own-active-utxos"
-        (info pOwnActive $ progDesc "Query all own active UTxOs for a given trading pair.")
-    , command "specific-contract"
-        (info pSpecificContract $ progDesc "Query the information for a specific active contract.")
-    , command "own-contracts"
-        (info pOwnContracts $ progDesc "Lookup all contractIDs in a user's address.")
-    ]
-  where
-    pAvailableContracts :: Parser Query
-    pAvailableContracts = QueryAvailableContracts <$> pNetwork <*> pBeaconPolicy <*> pOutput
+pQueryProposals :: Parser Query
+pQueryProposals =
+  QueryProposals
+    <$> pNetwork
+    <*> pApiService
+    <*> ((Just <$> pOfferAsset) <|> pure Nothing)
+    <*> ((Just <$> pAskAsset) <|> pure Nothing)
+    <*> ((Just <$> pPremiumAsset) <|> pure Nothing)
+    <*> ((Just <$> pBech32Address) <|> pure Nothing)
+    <*> pFormat
+    <*> pOutput
 
-    pOwnAssets :: Parser Query
-    pOwnAssets = QueryOwnAssetsUTxOs <$> pNetwork <*> pBeaconPolicy <*> pOptionsAddr <*> pOutput
-
-    pOwnProposals :: Parser Query
-    pOwnProposals = QueryOwnProposedUTxOs <$> pNetwork <*> pBeaconPolicy <*> pOptionsAddr <*> pOutput
-
-    pOwnActive :: Parser Query
-    pOwnActive = QueryOwnActiveUTxOs <$> pNetwork <*> pBeaconPolicy <*> pOptionsAddr <*> pOutput
-
-    pSpecificContract :: Parser Query
-    pSpecificContract = QuerySpecificContract <$> pNetwork <*> pBeaconPolicy <*> pContractId <*> pOutput
-
-    pOwnContracts :: Parser Query
-    pOwnContracts = QueryOwnContracts <$> pNetwork <*> pBeaconPolicy <*> pOptionsAddr <*> pOutput
-
-    pOptionsAddr :: Parser OptionsAddress
-    pOptionsAddr = OptionsAddress <$> pBech32Address
+pQueryActives :: Parser Query
+pQueryActives =
+  QueryActives
+    <$> pNetwork
+    <*> pApiService
+    <*> ((Just <$> pOfferAsset) <|> pure Nothing)
+    <*> ((Just <$> pAskAsset) <|> pure Nothing)
+    <*> ((Just <$> pContractId) <|> pure Nothing)
+    <*> ((Just <$> pBech32Address) <|> pure Nothing)
+    <*> pFormat
+    <*> pOutput
 
 -------------------------------------------------
 -- Basic Helper Parsers
@@ -242,213 +540,132 @@ pOutputFile :: Parser FilePath
 pOutputFile = strOption
   (  long "out-file"
   <> metavar "FILE"
-  <> help "The output file."
+  <> help "Save to file."
   <> completer (bashCompleter "file")
   )
 
-pCurrentAsset :: Parser (CurrencySymbol,TokenName)
-pCurrentAsset = pCurrentAssetLovelace <|> ((,) <$> pCurrentAssetCurrencySymbol <*> pCurrentAssetTokenName)
+pNetwork :: Parser Network
+pNetwork = pPreProdTestnet <|> pMainnet
   where
-    pCurrentAssetLovelace :: Parser (CurrencySymbol,TokenName)
-    pCurrentAssetLovelace = flag' (adaSymbol,adaToken)
-      (  long "current-asset-is-lovelace"
-      <> help "The current asset is lovelace"
-      )
+    pPreProdTestnet :: Parser Network
+    pPreProdTestnet = flag' PreProdTestnet
+      (  long "testnet"
+      <> help "For the preproduction testnet.")
 
-    pCurrentAssetCurrencySymbol :: Parser CurrencySymbol
-    pCurrentAssetCurrencySymbol = option (eitherReader readCurrencySymbol)
-      (  long "current-asset-policy-id" 
-      <> metavar "STRING" 
-      <> help "The policy id of the current asset."
-      )
+    pMainnet :: Parser Network
+    pMainnet = flag' Mainnet
+      (  long "mainnet"
+      <> help "For the mainnet.")
 
-    pCurrentAssetTokenName :: Parser TokenName
-    pCurrentAssetTokenName = option (eitherReader readTokenName)
-      (  long "current-asset-token-name"
-      <> metavar "STRING"
-      <> help "The token name (in hexidecimal) of the current asset."
-      )
-
-pDesiredAsset :: Parser (CurrencySymbol,TokenName)
-pDesiredAsset = pDesiredAssetLovelace <|> ((,) <$> pDesiredAssetCurrencySymbol <*> pDesiredAssetTokenName)
-  where
-    pDesiredAssetLovelace :: Parser (CurrencySymbol,TokenName)
-    pDesiredAssetLovelace = flag' (adaSymbol,adaToken)
-      (  long "desired-asset-is-lovelace"
-      <> help "The desired asset is lovelace"
-      )
-
-    pDesiredAssetCurrencySymbol :: Parser CurrencySymbol
-    pDesiredAssetCurrencySymbol = option (eitherReader readCurrencySymbol)
-      (  long "desired-asset-policy-id" 
-      <> metavar "STRING" 
-      <> help "The policy id of the desired asset."
-      )
-
-    pDesiredAssetTokenName :: Parser TokenName
-    pDesiredAssetTokenName = option (eitherReader readTokenName)
-      (  long "desired-asset-token-name"
-      <> metavar "STRING"
-      <> help "The token name (in hexidecimal) of the desired asset."
-      )
-
-pOptionsConfig :: Parser OptionsConfig
-pOptionsConfig = OptionsConfig <$> pCurrentAsset <*> pDesiredAsset
-
-pBeaconPolicy :: Parser CurrencySymbol
-pBeaconPolicy = option (eitherReader readCurrencySymbol)
-  (  long "beacon-policy-id"
+pApiService :: Parser ApiService
+pApiService = pure Koios
+  -- where
+  --   pKoios :: Parser Endpoint
+  --   pKoios = flag' Koios
+  --     (  long "koios"
+  --     <> help "Use Koios."
+  --     )
+  --
+  
+pContractId :: Parser ContractId
+pContractId = ContractId <$> option (eitherReader readTokenName)
+  (  long "contract-id"
   <> metavar "STRING"
-  <> help "Policy id for that trading pair's beacon policy.")
-
-pCurrentAssetQuantity :: Parser Integer
-pCurrentAssetQuantity = option auto
-  (  long "quantity"
-  <> metavar "INT"
-  <> help "Quantity of current asset to be traded."
+  <> help "The contract id for this options contract."
   )
 
-pAssetsForContract :: Parser OptionsDatum
-pAssetsForContract = 
-  AssetsForContract 
-    <$> pBeaconPolicy 
-    <*> pCurrentAsset 
-    <*> pCurrentAssetQuantity
-    <*> pDesiredAsset
+pAsset :: String -> Parser (CurrencySymbol,TokenName)
+pAsset prefix = option (eitherReader readAsset)
+  (  long (prefix <> "-asset")
+  <> metavar "STRING"
+  <> help ("The " <> prefix <> " asset (lovelace or policy_id.asset_name).")
+  )
 
-pStrikePrice :: Parser PlutusRational
-pStrikePrice = unsafeRatio <$> pStrikePriceNum <*> pStrikePriceDen
-  where
-    pStrikePriceNum :: Parser Integer
-    pStrikePriceNum = option auto
-      ( long "strike-price-numerator"
-      <> metavar "INT"
-      <> help "The numerator of the strike price."
-      )
+pOfferAsset :: Parser OfferAsset
+pOfferAsset = OfferAsset <$> pAsset "offer"
 
-    pStrikePriceDen :: Parser Integer
-    pStrikePriceDen = option auto
-      ( long "strike-price-denominator"
-      <> metavar "INT"
-      <> help "The denominator of the strike price."
-      )
+pAskAsset :: Parser AskAsset
+pAskAsset = AskAsset <$> pAsset "ask"
 
-pAddress :: Parser Address
-pAddress = 
-    Address
-      <$> pPaymentCredential
-      <*> (pStakingCredential <|> pure Nothing)
-  where
-    pPaymentScriptCredential :: Parser Credential
-    pPaymentScriptCredential = ScriptCredential <$> option (eitherReader readValidatorHash)
-      (  long "payment-script-hash"
-      <> metavar "STRING"
-      <> help "The hash of the payment script used in the address."
-      )
+pPremiumAsset :: Parser PremiumAsset
+pPremiumAsset = PremiumAsset <$> pAsset "premium"
 
-    pPaymentPubKeyCredential :: Parser Credential
-    pPaymentPubKeyCredential = PubKeyCredential <$> option (eitherReader readPubKeyHash)
-      ( long "payment-pubkey-hash"
-      <> metavar "STRING"
-      <> help "The hash of the payment pubkey used in the address."
-      )
+pOfferQuantity :: Parser Integer
+pOfferQuantity = option auto
+  (  long "quantity"
+  <> metavar "INT"
+  <> help "The amount offered."
+  )
 
-    pPaymentCredential :: Parser Credential
-    pPaymentCredential = pPaymentPubKeyCredential <|> pPaymentScriptCredential
+pContractDeposit :: Parser Integer
+pContractDeposit = option auto
+  (  long "deposit"
+  <> metavar "INT"
+  <> help "The amount used for the minUTxOValue."
+  )
 
-    pStakingScriptCredential :: Parser StakingCredential
-    pStakingScriptCredential = StakingHash . ScriptCredential <$> option (eitherReader readValidatorHash)
-      (  long "staking-script-hash"
-      <> metavar "STRING"
-      <> help "The hash of the staking script used in the address."
-      )
-
-    pStakingPubKeyCredential :: Parser StakingCredential
-    pStakingPubKeyCredential = StakingHash . PubKeyCredential <$> option (eitherReader readPubKeyHash)
-      (  long "staking-pubkey-hash"
-      <> metavar "STRING"
-      <> help "The hash of the staking pubkey used in the address."
-      )
-
-    pStakingCredential :: Parser (Maybe StakingCredential)
-    pStakingCredential = Just <$> (pStakingPubKeyCredential <|> pStakingScriptCredential)
-
-pPremiumAsset :: Parser (CurrencySymbol,TokenName)
-pPremiumAsset = pPremiumAssetLovelace <|> ((,) <$> pPremiumAssetCurrencySymbol <*> pPremiumAssetTokenName)
-  where
-    pPremiumAssetLovelace :: Parser (CurrencySymbol,TokenName)
-    pPremiumAssetLovelace = flag' (adaSymbol,adaToken)
-      (  long "premium-asset-is-lovelace"
-      <> help "The premium asset is lovelace"
-      )
-
-    pPremiumAssetCurrencySymbol :: Parser CurrencySymbol
-    pPremiumAssetCurrencySymbol = option (eitherReader readCurrencySymbol)
-      (  long "premium-asset-policy-id" 
-      <> metavar "STRING" 
-      <> help "The policy id of the premium asset."
-      )
-
-    pPremiumAssetTokenName :: Parser TokenName
-    pPremiumAssetTokenName = option (eitherReader readTokenName)
-      (  long "premium-asset-token-name"
-      <> metavar "STRING"
-      <> help "The token name (in hexidecimal) of the premium asset."
-      )
+pPaymentAddress :: Parser Address
+pPaymentAddress = 
+  option (maybeReader $ rightToMaybe . paymentAddressToPlutusAddress . PaymentAddress . toText)
+    (  long "payment-address"
+    <> metavar "BECH32"
+    <> help "The address where payments must go."
+    )
 
 pPremium :: Parser Integer
 pPremium = option auto
   (  long "premium"
   <> metavar "INT"
-  <> help "The amount for the premium."
+  <> help "The amount requested for the premium."
+  )
+
+pStrikePrice :: Parser Fraction
+pStrikePrice = option (eitherReader readFraction)
+  (  long "strike-price"
+  <> metavar "FRACTION"
+  <> help "The strike price for the contract."
   )
 
 pExpiration :: Parser POSIXTime
-pExpiration = slotToPOSIXTime . Slot <$> option auto
+pExpiration = POSIXTime <$> option auto
   (  long "expiration"
+  <> metavar "TIME"
+  <> help "The expiration time for the options contract in POSIX time (milliseconds)."
+  )
+
+pPossibleTerm :: Parser Terms
+pPossibleTerm =
+  Terms
+    <$> pPremium
+    <*> pStrikePrice
+    <*> pExpiration
+
+pDepositIncrease :: Parser Integer
+pDepositIncrease = option auto
+  (  long "deposit-increase"
   <> metavar "INT"
-  <> help "The slot at which the contract expires."
+  <> help "The ada added for the minUTxOValue increase."
   )
 
-pProposedContract :: Parser OptionsDatum
-pProposedContract = 
-  ProposedContract
-    <$> pBeaconPolicy
-    <*> pCurrentAsset
-    <*> pCurrentAssetQuantity
-    <*> pDesiredAsset
-    <*> pStrikePrice
-    <*> pAddress -- ^ Creator's address
-    <*> pPremiumAsset
-    <*> pPremium
-    <*> pExpiration
-
-pContractId :: Parser TokenName
-pContractId = option (eitherReader readTokenName)
-  (  long "contract-id"
-  <> metavar "STRING"
-  <> help "The ContractID for this contract."
+pDesiredTermsIndex :: Parser Integer
+pDesiredTermsIndex = option auto
+  (  long "desired-terms-index"
+  <> metavar "INT"
+  <> help "The 0-based index for the desired terms."
   )
 
-pActiveContract :: Parser OptionsDatum
-pActiveContract = 
-  ActiveContract
-    <$> pBeaconPolicy
-    <*> pCurrentAsset
-    <*> pCurrentAssetQuantity
-    <*> pDesiredAsset
-    <*> pStrikePrice
-    <*> pAddress -- ^ Creator's address
-    <*> pPremiumAsset
-    <*> pPremium
-    <*> pExpiration
-    <*> pContractId
-
-pBech32Address :: Parser String
-pBech32Address = strOption
-  (  long "address"
+pProposalTxOutRef :: Parser TxOutRef
+pProposalTxOutRef = option (eitherReader readTxOutRef)
+  (  long "proposal-ref"
   <> metavar "STRING"
-  <> help "Address in bech32 format."
+  <> help "The output reference for the corresponding proposal input 'tx_hash#index'."
+  )
+
+pContractTxOutRef :: Parser TxOutRef
+pContractTxOutRef = option (eitherReader readTxOutRef)
+  (  long "contract-ref"
+  <> metavar "STRING"
+  <> help "The output reference for the corresponding proposal input 'tx_hash#index'."
   )
 
 pOutput :: Parser Output
@@ -460,11 +677,37 @@ pOutput = pStdOut <|> File <$> pOutputFile
       <> help "Display to stdout."
       )
 
-pNetwork :: Parser Network
-pNetwork = pPreProdTestnet
+pTxFile :: Parser FilePath
+pTxFile = strOption
+  (  long "tx-file"
+  <> metavar "STRING"
+  <> help "Transaction file path."
+  )
+
+pFormat :: Parser Format
+pFormat = pJSON <|> pPretty <|> pPlain
   where
-    pPreProdTestnet :: Parser Network
-    pPreProdTestnet = PreProdTestnet <$> strOption
-      (  long "preprod-testnet"
-      <> metavar "STRING"
-      <> help "Query the preproduction testnet using the Blockfrost Api with the supplied api key.")
+    pJSON :: Parser Format
+    pJSON = flag' JSON
+      (  long "json"
+      <> help "Format as JSON."
+      )
+
+    pPretty :: Parser Format
+    pPretty = flag' Pretty
+      (  long "pretty"
+      <> help "Format for pretty-printing."
+      )
+
+    pPlain :: Parser Format
+    pPlain = flag' Plain
+      (  long "plain"
+      <> help "Format for pretty-printing without colors."
+      )
+
+pBech32Address :: Parser PaymentAddress
+pBech32Address = PaymentAddress <$> strOption
+    (  long "address"
+    <> metavar "BECH32"
+    <> help "The target address."
+    )

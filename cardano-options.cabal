@@ -1,107 +1,145 @@
 cabal-version:      2.4
 name:               cardano-options
-version:            0.1.0.0
+version:            1.0.0.0
 
-synopsis: A distributed Cardano P2P Options dApp PoC.
+synopsis: A distributed Cardano P2P Options Trading protocol.
 license: Apache-2.0
 author: fallen-icarus
 maintainer: modern.daidalos+git@gmail.com
 copyright: 2023 fallen-icarus
-extra-source-files: CHANGELOG.md
+extra-source-files: 
+    CHANGELOG.md
+  , aiken/plutus.json
+  , mainnet-params.json
+  , preprod-params.json
 
 common lang
-  build-depends: base ^>=4.14
-  default-language: Haskell2010
+  build-depends: base
+  default-language: GHC2021
   ghc-options: -Wall -Wredundant-constraints
+  default-extensions:
+    OverloadedLabels
+    OverloadedStrings
+    RecordWildCards
 
-common plutus-internals
+common internals
   build-depends:
-    cardano-api,
-    plutus-ledger,
-    plutus-ledger-api,
-    plutus-tx,
-    plutus-tx-plugin,
-    plutus-script-utils,
-    plutus-core,
-    cardano-node-emulator
+      cardano-api
+    , plutus-ledger
+    , plutus-ledger-api
+    , plutus-tx
+    , plutus-core
+    , plutus-script-utils
+    , containers
+    , aeson
+    , text
+    , bytestring
+    , prettyprinter
+    , relude
+    , optics-core
 
 library
   import: 
-    lang,
-    plutus-internals
-  exposed-modules: CardanoOptions
+      lang
+    , internals
+  exposed-modules: 
+      CardanoOptions
+    , CardanoOptions.Blueprints
+    , CardanoOptions.Types
+    , CardanoOptions.Utils
   build-depends:
-    bytestring,
-    serialise,
-    aeson,
-    plutonomy,
-    text
+      serialise
+    , file-embed
+    , base16-bytestring
+    , optics-th
+    , cardano-loans
+    , microlens
   hs-source-dirs: src
-  ghc-options: 
-    -fobject-code 
-    -fno-ignore-interface-pragmas 
-    -fno-omit-interface-pragmas 
-    -fno-specialise
 
 test-suite cardano-options-tests
   import: 
-    lang,
-    plutus-internals
+      lang
+    , internals
   type: exitcode-stdio-1.0
   main-is: Test.hs
   hs-source-dirs: test
   ghc-options:
-    -threaded -rtsopts -with-rtsopts=-N
-    -Wno-unused-local-binds -Wno-unused-matches -Wno-deprecations
   other-modules:
-      Test.AcceptContract
-    , Test.CloseAssetsUTxO
-    , Test.CloseExpiredContract
-    , Test.CloseProposalUTxO
-    , Test.Common
-    , Test.CreateAssetsUTxO
-    , Test.ExecuteContract
-    , Test.ProposeContracts
-    , Test.UpdateAddress
+      Test.ActiveUTxOs
+    , Test.ActiveUTxOs.CloseExpiredContract
+    , Test.ActiveUTxOs.CloseExpiredContract.Benchmarks
+    , Test.ActiveUTxOs.CloseExpiredContract.Failures
+    , Test.ActiveUTxOs.CloseExpiredContract.Regressions
+    , Test.ActiveUTxOs.ExecuteContract
+    , Test.ActiveUTxOs.ExecuteContract.Benchmarks
+    , Test.ActiveUTxOs.ExecuteContract.Failures
+    , Test.ActiveUTxOs.ExecuteContract.Regressions
+    , Test.ActiveUTxOs.Misc
+    , Test.ActiveUTxOs.PurchaseContract
+    , Test.ActiveUTxOs.PurchaseContract.Benchmarks
+    , Test.ActiveUTxOs.PurchaseContract.Failures
+    , Test.ActiveUTxOs.PurchaseContract.Regressions
+    , Test.ActiveUTxOs.UpdatePaymentAddress
+    , Test.ActiveUTxOs.UpdatePaymentAddress.Benchmarks
+    , Test.ActiveUTxOs.UpdatePaymentAddress.Failures
+    , Test.ActiveUTxOs.UpdatePaymentAddress.Regressions
+    , Test.Beacons
+    , Test.Misc
+    , Test.Prelude
+    , Test.ProposalUTxOs
+    , Test.ProposalUTxOs.CloseProposal
+    , Test.ProposalUTxOs.CloseProposal.Benchmarks
+    , Test.ProposalUTxOs.CloseProposal.Failures
+    , Test.ProposalUTxOs.CloseProposal.Regressions
+    , Test.ProposalUTxOs.CreateProposal
+    , Test.ProposalUTxOs.CreateProposal.Benchmarks
+    , Test.ProposalUTxOs.CreateProposal.Failures
+    , Test.ProposalUTxOs.CreateProposal.Regressions
+    , Test.ProposalUTxOs.UpdateProposal
+    , Test.ProposalUTxOs.UpdateProposal.Benchmarks
+    , Test.ProposalUTxOs.UpdateProposal.Failures
+    , Test.ProposalUTxOs.UpdateProposal.Regressions
   build-depends:
-    cardano-options,
-    plutus-contract,
-    plutus-tx-constraints,
-    aeson,
-    text,
-    containers,
-    data-default,
-    tasty,
-    lens,
-    tasty-hunit,
+      cardano-options
+    , data-default
+    , tasty
+    , tasty-hunit
+    , mtl
+    , microlens
+    , cardano-node-emulator
+    , optics-extra
 
 executable cardano-options
-    import: lang
-    main-is:          Main.hs
-
-    -- Modules included in this executable, other than Main.
-    other-modules:
-        CLI.Types
-      , CLI.Parsers
-      , CLI.Run
-      , CLI.BlockfrostApi
-      , CLI.Query
-    build-depends:    
-      cardano-options,
-      optparse-applicative,
-      servant,
-      aeson,
-      servant-client,
-      http-client,
-      http-client-tls,
-      text,
-      containers,
-      vector,
-      aeson-pretty,
-      bytestring,
-      utf8-string,
-      cardano-addresses,
-      text
-    ghc-options: -O2
-    hs-source-dirs:   app
-    default-language: Haskell2010
+  import: 
+      lang
+    , internals
+  main-is: Main.hs
+  other-modules:
+      CLI.Data.ApiService
+    , CLI.Data.Asset
+    , CLI.Data.Bech32Address
+    , CLI.Data.Commands
+    , CLI.Data.Network
+    , CLI.Data.OptionsUTxO
+    , CLI.Data.Output
+    , CLI.Data.PersonalUTxO
+    , CLI.Data.TxCBOR
+    , CLI.Parsers
+    , CLI.Query
+    , CLI.Query.Koios
+    , CLI.Run
+  build-depends:    
+      cardano-options
+    , cardano-addresses
+    , optparse-applicative
+    , servant
+    , servant-client
+    , http-client
+    , http-client-tls
+    , vector
+    , aeson-pretty
+    , file-embed
+    , prettyprinter-ansi-terminal
+  hs-source-dirs: app
+  default-extensions:
+    NoImplicitPrelude
